@@ -67,6 +67,12 @@ export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDis
  */
 export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, aromeifs: 1, harmonie2km: 1, harmonie: 1, arpege: 3, arpege025: 3, icon: 6, ukmo: 6, iconeu: 4, wrf: 3, cep: 15, aifs: 14, gfs: 15 };
 
+/**
+ * Dernier jour (J+n) d'une période « sur une période » : les modèles à courte échéance (AROME 48 h, AROME-IFS 51 h, Harmonie 60 h)
+ * vont un jour plus loin que leurs cartes de jour, jusqu'à la fin de leur échéance (la dernière journée n'est couverte qu'en partie).
+ */
+export const ECHEANCE_PERIODE_MAX: Record<ModeleMeteo, number> = { ...ECHEANCE_MAX, arome: 2, aromeifs: 2, harmonie2km: 2, harmonie: 2 };
+
 /** Un point par département métropolitain (ou par ville), avec les valeurs de l'après-midi (15 h-18 h) et de la journée. */
 export interface PointCarte {
   code: string;
@@ -143,6 +149,19 @@ export interface PointCarte {
   mini24h?: number | null;
   orage24h?: number | null;
   neige24h?: number | null;
+  /**
+   * Carte de France (un point par département) : cumul de pluie (mm) de la commune la plus arrosée du département, toutes ses
+   * communes comptées (jour, 24 h et 36 h à partir de maintenant, période, 3, 5, 10 et 16 jours), voir pluiesMaximales. Absents des
+   * points de ville (région, département) : la carte prend alors la valeur de la ville.
+   */
+  pluieJourneeMax?: number | null;
+  pluie24hMax?: number | null;
+  pluie36hMax?: number | null;
+  pluiePeriodeMax?: number | null;
+  pluie3jMax?: number | null;
+  pluie5jMax?: number | null;
+  pluie10jMax?: number | null;
+  pluie16jMax?: number | null;
   pluie3j?: number | null;
   pluie5j?: number | null;
   pluie10j?: number | null;
@@ -195,6 +214,17 @@ export const DUREES_TENDANCES = [2, 4, 6, 8, 10, 12, 14, 16] as const;
  * à partir de minuit selon le passage) ; un passage GFS publié tronqué (≈ 4 jours) ne donne pas de cumul sur 10 jours.
  */
 const COUVERTURE_MIN_CUMUL = 0.85;
+/** Série « à courte échéance » (AROME 48 h, AROME-IFS 51 h, Harmonie 60 h) : moins de 66 h entre sa première et sa dernière échéance. */
+const ECHEANCE_COURTE_MS = 66 * 3_600_000;
+
+/**
+ * Fin d'une période : `fin` (minuit après son dernier jour), sauf pour une série à courte échéance qui ne couvre qu'en partie ce
+ * dernier jour : la période s'arrête alors à sa dernière échéance (« jusqu'à la fin du modèle »), au lieu de donner une carte vide.
+ */
+function finEffectivePeriode(premiere: number, derniereSerie: number, derniereFenetre: number | null, fin: number): number {
+  const courte = derniereSerie - premiere <= ECHEANCE_COURTE_MS;
+  return courte && derniereFenetre != null && derniereFenetre < fin && derniereFenetre > fin - 86_400_000 ? derniereFenetre : fin;
+}
 
 /** Codes départementaux dans l'ordre officiel (01 … 19, 2A, 2B, 21 … 95) : les clés « 10 », « 11 »… passeraient sinon devant « 01 ». */
 const rang = (code: string) => (code === '2A' ? 19.1 : code === '2B' ? 19.2 : Number(code));
@@ -346,6 +376,71 @@ function rafaleEntre(serie: Serie, debut: number, fin: number): { valeur: number
   return { valeur: i >= 0 ? arrondi(serie.rafale[i]) : null, direction: directionRafaleMax(serie, indices.map((x) => x.i)) };
 }
 
+/** Pluie des points de grille d'un département : mêmes échéances `t` pour tous, une série de cumuls (mm par échéance) par point. */
+export interface PluiePoints {
+  t: string[];
+  pluie: (number | null)[][];
+}
+
+export type PluiesMaximales = Pick<PointCarte, 'pluieJourneeMax' | 'pluie24hMax' | 'pluie36hMax' | 'pluiePeriodeMax' | 'pluie3jMax' | 'pluie5jMax' | 'pluie10jMax' | 'pluie16jMax' | 'pluieRun'>;
+
+/**
+ * Pluie de la commune la plus arrosée d'un département (carte de France par département), pour chaque fenêtre des cartes de
+ * pluie. Mêmes fenêtres et même couverture minimale que pour la ville du département (cumulEntre) ; le jour est la vraie journée
+ * de 24 h : l'échéance de 0 h est la pluie de l'heure qui précède, elle compte pour le jour qui finit. `maintenant` : instant de
+ * départ des fenêtres glissantes (24 h, 36 h, jusqu'à la fin du run).
+ */
+export function pluiesMaximales(p: PluiePoints, dateISO: string, finPeriode?: string, maintenant = Date.now()): Partial<PluiesMaximales> {
+  const ms = p.t.map((t) => Date.parse(t));
+  const echeances = ms.filter((m) => Number.isFinite(m));
+  const finRun = echeances.length ? Math.max(...echeances) : null;
+  const debut = minuitParis(dateISO);
+  const heure = 3_600_000;
+  const jour = 86_400_000;
+  const fenetres: [keyof PluiesMaximales, number, number][] = [
+    ['pluieJourneeMax', debut, minuitParis(ajouterJours(dateISO, 1))],
+    ['pluie24hMax', maintenant, maintenant + 24 * heure],
+    ['pluie36hMax', maintenant, maintenant + 36 * heure],
+    ['pluie3jMax', debut, debut + 3 * jour],
+    ['pluie5jMax', debut, debut + 5 * jour],
+    ['pluie10jMax', debut, debut + 10 * jour],
+    ['pluie16jMax', debut, debut + 16 * jour],
+  ];
+  if (finPeriode) fenetres.push(['pluiePeriodeMax', debut, minuitParis(ajouterJours(finPeriode, 1))]);
+  if (finRun != null && finRun > maintenant) fenetres.push(['pluieRun', maintenant, finRun]);
+  const resultat: Partial<PluiesMaximales> = {};
+  for (const [cle, deb, fin] of fenetres) {
+    // Échéances de la fenêtre : début exclu, fin comprise.
+    let premiere = -1;
+    let derniere = -1;
+    for (let i = 0; i < ms.length; i++) {
+      if (ms[i] > deb && ms[i] <= fin) {
+        if (premiere < 0) premiere = i;
+        derniere = i;
+      }
+    }
+    // Période : jusqu'à la fin du modèle pour une série à courte échéance (voir finEffectivePeriode).
+    const finFenetre = cle === 'pluiePeriodeMax' && premiere >= 0 ? finEffectivePeriode(ms[0], ms[ms.length - 1], ms[derniere], fin) : fin;
+    let meilleur: number | null = null;
+    if (premiere >= 0) {
+      for (const serie of p.pluie) {
+        let somme = 0;
+        let derniereValeur = -1;
+        for (let i = premiere; i <= derniere; i++) {
+          const v = serie[i];
+          if (typeof v === 'number') {
+            somme += v;
+            derniereValeur = ms[i];
+          }
+        }
+        if (derniereValeur >= 0 && (derniereValeur - deb) / (finFenetre - deb) >= COUVERTURE_MIN_CUMUL && (meilleur == null || somme > meilleur)) meilleur = somme;
+      }
+    }
+    resultat[cle] = meilleur == null ? null : arrondi(meilleur, 1);
+  }
+  return resultat;
+}
+
 /** Valeur extrême (maximum ou minimum) d'un champ de la série entre deux instants (ms), si la série couvre assez de la période. */
 function extremeEntre(serie: Serie, debut: number, fin: number, champ: 'temp' | 'rafale' | 'orage', sens: 'max' | 'min'): number | null {
   const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t, i }) => t > debut && t <= fin && serie[champ][i] != null);
@@ -440,16 +535,19 @@ function valeursSurPeriode(
   const fin = minuitParis(ajouterJours(finISO, 1));
   const indices = serie.t.map((t, i) => ({ t: Date.parse(t), i })).filter(({ t }) => t > debut && t <= fin);
   const derniere = indices.length ? indices[indices.length - 1].t : null;
-  const couvert = derniere != null && (derniere - debut) / (fin - debut) >= COUVERTURE_MIN_CUMUL;
+  // Jusqu'à la fin du modèle : une série à courte échéance (AROME…) ne couvre qu'en partie la dernière journée de la période.
+  const echeances = serie.t.map((t) => Date.parse(t));
+  const finEff = finEffectivePeriode(echeances[0], echeances[echeances.length - 1], derniere, fin);
+  const couvert = derniere != null && (derniere - debut) / (finEff - debut) >= COUVERTURE_MIN_CUMUL;
   // À longue échéance, les pas de 6 h tombent à 1, 7, 13 et 19 h en hiver.
   // Pour les extrêmes, tolérer le dernier intervalle d’échantillonnage avant minuit.
   // Les cumuls conservent leur contrôle de couverture propre.
   const pasFinal = indices.length >= 2 ? indices[indices.length - 1].t - indices[indices.length - 2].t : 0;
-  const couvertTemperature = couvert || (derniere != null && pasFinal > 0 && fin - derniere <= Math.min(pasFinal, 6 * 3600_000));
+  const couvertTemperature = couvert || (derniere != null && pasFinal > 0 && finEff - derniere <= Math.min(pasFinal, 6 * 3600_000));
   const de = (champ: (number | null)[]) => indices.map(({ i }) => champ[i]);
   const rafale = indiceRafaleMax(serie, indices.map(({ i }) => i));
   return {
-    pluiePeriode: cumulEntre(serie, debut, fin).valeur,
+    pluiePeriode: cumulEntre(serie, debut, finEff).valeur,
     neigePeriode: couvert ? arrondi(somme(de(serie.neige)), 1) : null,
     rafalePeriode: couvert && rafale >= 0 ? arrondi(serie.rafale[rafale]) : null,
     directionRafalePeriode: couvert ? directionRafaleMax(serie, indices.map(({ i }) => i)) : null,

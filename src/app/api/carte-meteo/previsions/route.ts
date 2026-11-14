@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
-import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, estModele, modeleDisponible, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
+import { aujourdhuiParis, ajouterJours, CODES_DEPARTEMENTS, ECHEANCE_MAX, ECHEANCE_PERIODE_MAX, estModele, modeleDisponible, type ModeleMeteo } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerPrevisionsZones, chargerPrevisionsCarte, chargerPrevisionsMontagne, chargerPrevisionsVilles } from '@/lib/carte-meteo/sources';
 import { moyenneZones, moyenneCarte, moyenneMontagne, moyenneVilles } from '@/lib/carte-meteo/moyenne-modeles';
 
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
   // Pluie sur une période : du jour `date` au jour `fin` inclus (cartes infos), dans l'échéance du modèle.
   const fin = url.searchParams.get('fin') ?? undefined;
-  if (fin !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(fin) || fin < date || fin > ajouterJours(aujourdhui, ECHEANCE_MAX[modele]))) {
+  if (fin !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(fin) || fin < date || fin > ajouterJours(aujourdhui, ECHEANCE_PERIODE_MAX[modele]))) {
     return NextResponse.json({ erreur: 'Période invalide pour ce modèle.' }, { status: 400 });
   }
 

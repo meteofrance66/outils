@@ -6,7 +6,7 @@ import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { DEPARTEMENTS_FR } from './departements-fr';
 import { ALTITUDE_MAX_VILLE_FRANCE, VILLES_FRANCE } from './villes-france';
 import { pictoDepuisPrevision } from './pictos';
-import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pluieJusquaFinDuRun, pointDepuisSerie, rafaleJusquaFinDuRun, type ModeleMeteo, type ModeleSource, type PointCarte, type Serie } from './previsions-modeles';
+import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pluieJusquaFinDuRun, pluiesMaximales, pointDepuisSerie, rafaleJusquaFinDuRun, type ModeleMeteo, type ModeleSource, type PluiePoints, type PointCarte, type Serie } from './previsions-modeles';
 
 /**
  * Prévisions de la carte météo : les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (branche `data`),
@@ -85,6 +85,8 @@ interface Extrait {
   montagne: Ville[];
   /** Communes de relief selon l'altitude minimale du point du modèle (300, 500 et 2 000 m ; 1 000 m : `montagne`). */
   montagneAlt?: Record<number, Ville[]>;
+  /** Pluie de tous les points de grille du département (une série par point) : cumul de la commune la plus arrosée. */
+  pluiePoints?: PluiePoints;
 }
 
 interface Colonnes {
@@ -161,7 +163,7 @@ const caches = ((globalThis as { __cacheCarteMeteo?: unknown }).__cacheCarteMete
 const { memoire, enCours, indexCourant } = caches;
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v22'; // v22 : après-midi = 15 h à 18 h, température moyenne ; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v23'; // v23 : pluie de tous les points de grille du département (commune la plus arrosée) ; // v22 : après-midi = 15 h à 18 h, température moyenne ; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -445,6 +447,13 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
       return meilleure?.rafale[i] ?? null;
     });
   }
+  // Pluie de tous les points de grille du département (communes d'un même point comptées une fois), au même pas que les villes :
+  // sert au cumul de la commune la plus arrosée (carte de France par département).
+  const echeances = fichier.forecast.map(([t]) => t);
+  const pluies = [...new Set(communes.map((x) => x.pointId))].map((id) =>
+    etalerPas({ t: echeances, pluie: fichier.forecast.map(([, v]) => (typeof v[id]?.[c.precipitation_mm] === 'number' ? (v[id][c.precipitation_mm] as number) : null)) } as unknown as Serie)
+  );
+  const pluiePoints: PluiePoints | undefined = pluies.length ? { t: pluies[0].t, pluie: pluies.map((x) => x.pluie) } : undefined;
   return {
     runTime,
     chef,
@@ -452,6 +461,7 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     villes,
     montagne,
     montagneAlt,
+    ...(pluiePoints ? { pluiePoints } : {}),
   };
 }
 
@@ -549,7 +559,9 @@ export async function chargerPrevisionsCarteJours(
   datesISO: string[],
   apresMidiSeulement = false,
   /** Pluie sur une période : du jour demandé à ce jour (inclus), voir pointDepuisSerie. */
-  finPeriode?: string
+  finPeriode?: string,
+  /** Ajoute le cumul de la commune la plus arrosée de chaque département (cartes de pluie de la France), voir pluiesMaximales. */
+  pluieMax = false
 ): Promise<Record<string, PointCarte[] | null>> {
   const resultats = await enParallele(CODES_DEPARTEMENTS, CONCURRENCE, (dep) => extraitDepartement(modele, dep));
   const sortie: Record<string, PointCarte[] | null> = Object.fromEntries(datesISO.map((d) => [d, [] as PointCarte[] | null]));
@@ -577,6 +589,8 @@ export async function chargerPrevisionsCarteJours(
       // Pluie jusqu'à la fin du run : le cumul le plus élevé du département.
       const cumuls = [r.value.chef, ...r.value.villes.map((v) => v.serie)].map(pluieJusquaFinDuRun).filter((v): v is number => v != null);
       if (cumuls.length) point.pluieRun = Math.max(...cumuls);
+      // Cartes de pluie de la France : le cumul de la commune la plus arrosée du département, toutes ses communes comptées.
+      if (pluieMax && r.value.pluiePoints) Object.assign(point, pluiesMaximales(r.value.pluiePoints, date, finPeriode));
       if (finPeriode ? aValeursPeriode(point) : point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);
     }
   });
@@ -759,7 +773,7 @@ export async function chargerSeriesAnimationVilles(modele: ModeleSource, debutIS
 /** Prévisions des 96 départements pour un modèle et un jour (un point par département). */
 export async function chargerPrevisionsCarte(modele: ModeleMeteo, dateISO: string, finPeriode?: string): Promise<PointCarte[]> {
   if (modele === 'moyenne') throw new Error('La moyenne des modèles est réservée à la vue département');
-  const points = (await chargerPrevisionsCarteJours(modele, [dateISO], true, finPeriode))[dateISO];
+  const points = (await chargerPrevisionsCarteJours(modele, [dateISO], true, finPeriode, true))[dateISO];
   if (!points) throw new Error(`${LIBELLES[modele]} : aucune donnée pour le ${dateISO}`);
   return points;
 }

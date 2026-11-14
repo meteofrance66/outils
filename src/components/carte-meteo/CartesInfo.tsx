@@ -7,7 +7,7 @@ import { REGIONS_FR, REGION_PAR_DEPARTEMENT, departementsDeLaRegion } from '@/li
 import { ZONES_QUARTS, grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import { CLIMAT_REGIONS, type Horizon } from '@/lib/carte-meteo/climat-tracc';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
-import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
+import { CODES_DEPARTEMENTS, ECHEANCE_MAX, ECHEANCE_PERIODE_MAX, MODELES, ajouterJours, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
 import {
   GROUPE_DIRECT,
   GROUPE_JOURNEE,
@@ -18,6 +18,7 @@ import {
   THEMES_PREVISION,
   THEMES_PREVISION_CHOIX,
   parGroupe,
+  variantesRun,
   type ClimatCommune,
   type ClimatDepartements,
   type ReponseBilans,
@@ -149,6 +150,8 @@ const ALTITUDE_MAX_DEFAUT = 1000;
 const modeleDuCumul = (m: ModeleMeteo): ModeleMeteo => (m === 'gfs' ? 'gfs' : m === 'moyenne' ? 'moyenne' : 'cep');
 /** Échéance proposée : la moyenne des modèles va aussi loin que le CEP et GFS (elle moyenne ceux qui couvrent le jour). */
 const echeanceDe = (m: ModeleMeteo) => (m === 'moyenne' ? ECHEANCE_MAX.cep : ECHEANCE_MAX[m]);
+/** Dernier jour d'une période : un modèle à courte échéance (AROME…) va jusqu'à la fin de son échéance, un jour plus loin que ses cartes de jour. */
+const echeancePeriodeDe = (m: ModeleMeteo) => (m === 'moyenne' ? ECHEANCE_MAX.cep : ECHEANCE_PERIODE_MAX[m]);
 /** Paramètre de requête : ici, la moyenne est la moyenne complète (toutes les valeurs, France, régions, départements). */
 const paramModele = (m: ModeleMeteo) => (m === 'moyenne' ? 'moyenne&toutes=1' : m);
 /** Nom et source d'un modèle ; pour la moyenne, les modèles réellement moyennés (renvoyés par le serveur). */
@@ -156,6 +159,16 @@ const infosModele = (id: ModeleMeteo, modeles?: string[]) =>
   id === 'moyenne'
     ? { libelle: 'Moyenne des modèles', fournisseur: modeles?.length ? modeles.map((x) => MODELES.find((m) => m.id === x)?.libelle ?? x).join(', ') : 'modèles disponibles' }
     : MODELES.find((m) => m.id === id)!;
+
+/** Fin du run d'un modèle (« LUNDI 16 NOVEMBRE À 16 H ») d'après les points d'une réponse, pour le sous-titre des cartes « jusqu'à la fin du run ». */
+const finDuRun = (points: PointCarte[], libelleModele: string) => {
+  const pts = points.filter((p) => p.debutRun && p.finRun);
+  if (!pts.length) return null;
+  const fin = new Date(Math.max(...pts.map((p) => Date.parse(p.finRun as string))));
+  const jour = fin.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
+  const heure = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(fin).replace(/\D/g, ''); // chiffres seuls : le format français ajoute déjà « h »
+  return { fin: `${jour} à ${heure} h`.toUpperCase(), modele: libelleModele };
+};
 
 /** « SAMEDI 11 OCTOBRE » */
 const jourCourt = (dateISO: string) =>
@@ -205,7 +218,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
       // La carte n'existe qu'après le rendu de la catégorie : on attend qu'elle apparaisse.
       let essais = 0;
       const defiler = () => {
-        const el = document.getElementById(cible);
+        const el = document.getElementById(cible) ?? document.getElementById(`${cible}-arome`);
         if (el) el.scrollIntoView();
         else if (++essais < 40) setTimeout(defiler, 250);
       };
@@ -253,13 +266,17 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const [dureeRisque, setDureeRisque] = useState<'jour' | 'periode' | '24h'>('periode');
   const themesPrevision = useMemo<ThemePrevision[]>(
     () =>
-      (uneCarte ? THEMES_PREVISION_CHOIX : THEMES_PREVISION).map((t) => {
+      (uneCarte
+        ? THEMES_PREVISION_CHOIX
+        : // Cartes infos : « jusqu'à la fin du run » toujours pour AROME et Harmonie, chacun jusqu'au bout de son échéance (plus la carte du modèle choisi s'il est autre).
+          THEMES_PREVISION.flatMap((t) => (t.run ? [...variantesRun(t), ...(modele === 'arome' || modele === 'harmonie' || modele === 'moyenne' ? [] : [t])] : [t]))
+      ).map((t) => {
         let r: ThemePrevision = chiffres && t.brut ? { ...t, ...t.brut, texteValeur: undefined, neutresVisibles: true } : t;
         // Relief : les cartes de risque lisent les communes d'altitude (requête « montagne » avec l'altitude minimale choisie).
         if (reliefAlt > 0 && t.groupe === 'Risques') r = { ...r, montagne: true };
         return r;
       }),
-    [chiffres, reliefAlt, uneCarte]
+    [chiffres, reliefAlt, uneCarte, modele]
   );
   const [zonageFin, setZonageFin] = useState(false);
   const echelleValeurs = tailleValeurs / 100;
@@ -297,6 +314,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const [erreurClimat, setErreurClimat] = useState<string | null>(null);
 
   const [previsions, setPrevisions] = useState<{ cle: string; modele: ModeleMeteo; modeles?: string[]; points: (PointCarte & { dep?: string })[] } | null>(null);
+  /** Cartes « jusqu'à la fin du run » d'AROME et de Harmonie quand le modèle choisi est un autre : réponse, erreur et heure du passage de chacun. */
+  const [runsModeles, setRunsModeles] = useState<Record<string, { cle: string; points: (PointCarte & { dep?: string })[] }>>({});
+  const [erreursRuns, setErreursRuns] = useState<Record<string, string>>({});
+  const [zRuns, setZRuns] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
   const [cumuls, setCumuls] = useState<{ cle: string; modele: ModeleMeteo; points: (PointCarte & { dep?: string })[] } | null>(null);
   const [erreurCumuls, setErreurCumuls] = useState<string | null>(null);
@@ -320,14 +341,17 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const requeteZone = zonageFin && mode === 'prevision' && niveau === 'france' ? '&zones=9' : niveau === 'departement' ? `&dep=${departement}` : niveau === 'region' && !region.startsWith('gz:') ? `&deps=${codesDeLaZone(zone).join(',')}` : '';
   // Grandes zones (Nord, Sud, NO, NE, SO, SE) : les données de la France entière (un point par département), cadrées sur la zone.
   const cle = `${modele}|${dateISO}|${requeteZone}`;
+  /** Clé des prévisions d'un autre modèle pour sa carte « jusqu'à la fin du run » : toujours à partir d'aujourd'hui (le run part de maintenant). */
+  const cleRun = (m: string) => `${m}|${aujourdhui}|${requeteZone}`;
   const modeleCumul = modeleDuCumul(modele);
   const cleCumul = `${modeleCumul}|${aujourdhui}|${requeteZone}`;
   // Montagne : même modèle et même jour que les autres cartes, points au-dessus de 1 000 m.
   const cleMontagne = `${modele}|${dateISO}|${requeteZone}|montagne|${reliefAlt || 1000}`;
   // Période de pluie ramenée à l'échéance du modèle choisi (AROME : 2 jours, CEP : 15 jours).
   const jourMax = echeanceDe(modele);
+  const jourMaxPeriode = echeancePeriodeDe(modele);
   const debutPeriode = Math.min(periodePluie.debut, jourMax);
-  const finPeriode = Math.min(Math.max(periodePluie.fin, debutPeriode), jourMax);
+  const finPeriode = Math.min(Math.max(periodePluie.fin, debutPeriode), jourMaxPeriode);
   const debutPeriodeISO = ajouterJours(aujourdhui, debutPeriode);
   const finPeriodeISO = ajouterJours(aujourdhui, finPeriode);
   const clePeriode = `${modele}|${debutPeriodeISO}|${finPeriodeISO}|${requeteZone}|periode`;
@@ -527,6 +551,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
             ? pluiePeriode?.cle === clePeriode
               ? pluiePeriode.points
               : null
+          : theme.modeleImpose && theme.modeleImpose !== modele
+            ? runsModeles[theme.modeleImpose]?.cle === cleRun(theme.modeleImpose)
+              ? runsModeles[theme.modeleImpose].points
+              : null
           : previsions?.cle === cle
             ? previsions.points
             : null;
@@ -544,7 +572,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
       if (source) resultat[theme.id] = versPoints(theme, source);
     }
     return resultat;
-  }, [previsions, cle, cumuls, cleCumul, montagne, cleMontagne, montagnePeriode, cleMontagnePeriode, pluiePeriode, clePeriode, enDepartement, departement, niveau, themesPrevision]);
+  }, [previsions, cle, cumuls, cleCumul, montagne, cleMontagne, montagnePeriode, cleMontagnePeriode, pluiePeriode, clePeriode, enDepartement, departement, niveau, themesPrevision, runsModeles, modele, aujourdhui, requeteZone]);
 
   /** Pluie sur une période : sous-titre avec la période réellement couverte par le modèle. */
   const sousTitrePeriode = useMemo(() => {
@@ -552,20 +580,37 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     const couverte = fins.length ? dateParis(fins[0]) : finPeriodeISO;
     const fin = couverte < finPeriodeISO ? couverte : finPeriodeISO;
     const libelle = infosModele(modele).libelle;
+    // Dernière journée couverte en partie (AROME : jusqu'à la fin de l'échéance) : on dit jusqu'à quelle heure.
+    const heureFin = fins.length && couverte === finPeriodeISO ? Number(new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(new Date(fins[0])).replace(/\D/g, '')) : 0;
+    const mentionFin = fin < finPeriodeISO ? ' (FIN DU MODÈLE)' : heureFin > 0 && heureFin < 23 ? ` (JUSQU'À ${heureFin} H)` : '';
     return debutPeriodeISO === fin
-      ? `${jourCourt(debutPeriodeISO)} · ${libelle}`
-      : `DU ${jourCourt(debutPeriodeISO)} AU ${jourCourt(fin)}${fin < finPeriodeISO ? ' (FIN DU MODÈLE)' : ''} · ${libelle}`;
+      ? `${jourCourt(debutPeriodeISO)}${mentionFin} · ${libelle}`
+      : `DU ${jourCourt(debutPeriodeISO)} AU ${jourCourt(fin)}${mentionFin} · ${libelle}`;
   }, [pluiePeriode, clePeriode, finPeriodeISO, debutPeriodeISO, modele]);
 
   /** Cartes « jusqu'à la fin du run » : de maintenant à la dernière échéance de la série du modèle, pour le sous-titre. */
-  const sousTitreRun = useMemo(() => {
-    const pts = (previsions?.cle === cle ? previsions.points : []).filter((p) => p.debutRun && p.finRun);
-    if (!pts.length) return null;
-    const fin = new Date(Math.max(...pts.map((p) => Date.parse(p.finRun as string))));
-    const jour = fin.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
-    const heure = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(fin).replace(/\D/g, ''); // chiffres seuls : le format français ajoute déjà « h »
-    return { fin: `${jour} à ${heure} h`.toUpperCase(), modele: infosModele(modele, previsions?.modeles).libelle };
-  }, [previsions, cle, modele]);
+  const sousTitreRun = useMemo(() => finDuRun(previsions?.cle === cle ? previsions.points : [], infosModele(modele, previsions?.modeles).libelle), [previsions, cle, modele]);
+  /** Autre modèle que celui choisi (AROME ou Harmonie, toujours affichés) pour une carte « jusqu'à la fin du run » ; null si c'est le modèle choisi. */
+  const modeleAutre = (theme: ThemeInfo) => {
+    const m = (theme as ThemePrevision).modeleImpose;
+    return m && m !== modele ? m : null;
+  };
+  /** Heure du passage, fin du run et nature des données de la carte d'un thème : le modèle choisi, ou celui de la carte (AROME, Harmonie). */
+  const infoRun = (theme: ThemePrevision) => {
+    const m = modeleAutre(theme);
+    if (!m) return { runCarte, sousTitreRun, contexte: contextePrevision };
+    const infos = infosModele(m);
+    return {
+      runCarte: zRuns[m] ? { modele: infos.libelle.toUpperCase(), z: zRuns[m] } : undefined,
+      sousTitreRun: finDuRun(runsModeles[m]?.cle === cleRun(m) ? runsModeles[m].points : [], infos.libelle),
+      contexte: `Prévision du modèle ${infos.libelle} (${infos.fournisseur})`,
+    };
+  };
+  /** Titre de la carte : « … JUSQU'À LA FIN DU RUN » devient « … JUSQU'AU LUNDI 16 NOVEMBRE À 16 H ». */
+  const themeAffiche = (theme: ThemePrevision): ThemePrevision => {
+    const fin = infoRun(theme).sousTitreRun;
+    return theme.run && fin ? { ...theme, titre: theme.titre.replace('À LA FIN DU RUN', `AU ${fin.fin}`) } : theme;
+  };
 
   /** Cumuls : période réellement couverte (le CEP s'arrête à 15 jours), pour le sous-titre. */
   const finCumuls = useMemo(() => {
@@ -625,6 +670,30 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
         .filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi)
         // Risques : un danger à la fois, avec ses cartes du jour, de la période et des 24 h glissantes.
         .map((g) => (g.groupe === GROUPE_RISQUES && groupeChoisi === GROUPE_RISQUES ? { ...g, themes: g.themes.filter((t) => dangerDe(t.id) === dangerChoisi) } : g));
+  // AROME et Harmonie : leurs cartes « jusqu'à la fin du run » s'affichent toujours, même quand le modèle choisi est un autre.
+  const modelesRunAffiches = [...new Set(groupesAffiches.flatMap((g) => g.themes).map((t) => modeleAutre(t)).filter((m): m is NonNullable<typeof m> => m != null))].sort().join(',');
+  useEffect(() => {
+    if (bloque || mode !== 'prevision' || !modelesRunAffiches) return;
+    const controleur = new AbortController();
+    for (const m of modelesRunAffiches.split(',')) {
+      if (runsModeles[m]?.cle === cleRun(m) || erreursRuns[m]) continue;
+      fetch(`/api/carte-meteo/previsions/?modele=${m}&date=${aujourdhui}${requeteZone}`, { signal: controleur.signal })
+        .then(async (r) => {
+          if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
+          return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
+        })
+        .then((json) => setRunsModeles((r) => ({ ...r, [m]: { cle: cleRun(m), points: json.points } })))
+        .catch((e: Error) => {
+          if (e.name !== 'AbortError') setErreursRuns((r) => ({ ...r, [m]: e.message.endsWith('.') ? e.message : `${e.message}.` }));
+        });
+      fetch(`/api/carte-meteo/run/?modele=${m}`, { signal: controleur.signal })
+        .then((r) => (r.ok ? (r.json() as Promise<{ z?: string | null }>) : Promise.reject()))
+        .then((j) => j.z && setZRuns((r) => ({ ...r, [m]: j.z as string })))
+        .catch(() => {});
+    }
+    return () => controleur.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bloque, mode, modelesRunAffiches, aujourdhui, requeteZone, erreursRuns]);
   // Les données à charger (cumuls, périodes, montagne) dépendent du groupe : il suit toujours la carte affichée.
   useEffect(() => {
     if (carteEffective && carteEffective.groupe !== groupeChoisi) setGroupeChoisi(carteEffective.groupe);
@@ -1054,11 +1123,11 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                     className={selectBarre}
                     aria-label="Dernier jour de la période"
                   >
-                    {Array.from({ length: jourMax + 1 }, (_, n) => n)
+                    {Array.from({ length: jourMaxPeriode + 1 }, (_, n) => n)
                       .filter((n) => n >= debutPeriode)
                       .map((n) => (
                         <option key={n} value={n}>
-                          {NOM_ECHEANCE(n)} ({ajouterJours(aujourdhui, n).slice(8, 10)}/{ajouterJours(aujourdhui, n).slice(5, 7)})
+                          {NOM_ECHEANCE(n)} ({ajouterJours(aujourdhui, n).slice(8, 10)}/{ajouterJours(aujourdhui, n).slice(5, 7)}){n > jourMax ? ' · fin du modèle' : ''}
                         </option>
                       ))}
                   </select>
@@ -1528,20 +1597,31 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                       ) : (
                         <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">Chargement des points de montagne…</p>
                       )
+                    ) : mode === 'prevision' && modeleAutre(theme) && (erreursRuns[modeleAutre(theme)!] || runsModeles[modeleAutre(theme)!]?.cle !== cleRun(modeleAutre(theme)!)) ? (
+                      erreursRuns[modeleAutre(theme)!] ? (
+                        <p role="alert" className="flex items-center gap-3 rounded-xl border border-border bg-surface p-6 text-sm text-danger">
+                          {theme.court} : {erreursRuns[modeleAutre(theme)!]}
+                          <button type="button" onClick={() => setErreursRuns((r) => ({ ...r, [modeleAutre(theme)!]: '' }))} className="rounded-lg border border-border px-3 py-1 text-sm text-text">
+                            Réessayer
+                          </button>
+                        </p>
+                      ) : (
+                        <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">Chargement de la carte {infosModele(modeleAutre(theme)!).libelle}…</p>
+                      )
                     ) : mode === 'prevision' ? (
                       <CarteInfo
                           zonageFin={zonageFin && niveau === 'france'} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                         {...retouchesDe(theme.id)}
-                        theme={(theme as ThemePrevision).run && sousTitreRun ? { ...theme, titre: theme.titre.replace('À LA FIN DU RUN', `AU ${sousTitreRun.fin}`) } : theme}
+                        theme={themeAffiche(theme as ThemePrevision)}
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
-                        run={(theme as ThemePrevision).cumulJours ? undefined : runCarte}
+                        run={(theme as ThemePrevision).cumulJours ? undefined : infoRun(theme as ThemePrevision).runCarte}
                         dateCarte={dateISO}
                         sousTitre={
                           ((theme as ThemePrevision).fenetreHeures
                             ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!, instantFige)
-                            : (theme as ThemePrevision).run && sousTitreRun
-                            ? sousTitreRun.modele
+                            : (theme as ThemePrevision).run && infoRun(theme as ThemePrevision).sousTitreRun
+                            ? infoRun(theme as ThemePrevision).sousTitreRun!.modele
                             : (theme as ThemePrevision).periode
                             ? (theme as ThemePrevision).montagne
                               ? `${sousTitrePeriode} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET PLUS`
@@ -1554,7 +1634,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         }
                         logoId={logoId}
                         prefixeFichier={prefixe}
-                        contexte={(theme as ThemePrevision).montagne ? `${contextePrevision}, communes de montagne (point du modèle à ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} m ou plus)` : contextePrevision}
+                        contexte={(theme as ThemePrevision).montagne ? `${infoRun(theme as ThemePrevision).contexte}, communes de montagne (point du modèle à ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} m ou plus)` : infoRun(theme as ThemePrevision).contexte}
                       />
                     ) : mode === 'bilan' ? (
                       <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} {...retouchesDe(theme.id)} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />

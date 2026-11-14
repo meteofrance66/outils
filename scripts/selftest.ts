@@ -7,6 +7,7 @@ import { matchStations, parseSynop } from '../src/lib/obs/synop';
 import marignane from './fixtures/normales-13054001.json';
 import { regrouperMorceaux } from '../src/lib/carte-meteo/fronts';
 import { sousPlafondAltitude } from '../src/lib/carte-meteo/stations-bilan';
+import { pluiesMaximales, pointDepuisSerie } from '../src/lib/carte-meteo/previsions-modeles';
 
 let fail = 0;
 const eq = (name: string, cond: boolean, info = '') => { if (!cond) { fail++; console.error('✗', name, info); } else console.log('✓', name); };
@@ -214,6 +215,40 @@ const s2 = A('lever-coucher-soleil', { ville: 'paris', date: '2026-12-21' });
   eq('altitude : 1 000 m garde Le Frasnois, pas l’Aiguille du Midi', noms(sousPlafondAltitude(st, 1000)) === 'LE FRASNOIS,ABBEVILLE,SANS ALTITUDE,PILE 500 M', noms(sousPlafondAltitude(st, 1000)));
   eq('altitude : 0 ou absent = toutes les stations', sousPlafondAltitude(st, 0).length === 5 && sousPlafondAltitude(st).length === 5);
   eq('altitude : zone sans station sous le plafond = classement gardé', sousPlafondAltitude(st.slice(0, 2), 500).length === 2);
+}
+
+// Pluie de la commune la plus arrosée du département (cartes de pluie de la France) : vraies journées de 24 h, fenêtres glissantes, couverture.
+{
+  // AROME de 12 h UTC : échéances horaires du 14/11 12 h UTC au 16/11 12 h UTC (49 échéances).
+  const t = Array.from({ length: 49 }, (_, i) => new Date(Date.parse('2026-11-14T12:00:00Z') + i * 3_600_000).toISOString().replace('.000Z', 'Z'));
+  const serie = (valeurs: Record<string, number>) => t.map((x) => valeurs[x] ?? 0);
+  // Point A : 5 mm à l'échéance de 22 h UTC (cumul de 22 h à 23 h à Paris) et 10 mm à celle de 23 h UTC (23 h à minuit à Paris : dernière heure du 14, datée 0 h le 15).
+  const A = serie({ '2026-11-14T22:00:00Z': 5, '2026-11-14T23:00:00Z': 10, '2026-11-15T01:00:00Z': 2 });
+  const B = serie({ '2026-11-14T13:00:00Z': 1, '2026-11-14T14:00:00Z': 1, '2026-11-14T15:00:00Z': 1, '2026-11-14T16:00:00Z': 1, '2026-11-15T10:00:00Z': 30 });
+  const C: (number | null)[] = t.map(() => null);
+  const maintenant = Date.parse('2026-11-14T17:00:00Z');
+  const r = pluiesMaximales({ t, pluie: [A, B, C] }, '2026-11-14', '2026-11-15', maintenant);
+  // L'échéance de 23 h UTC (minuit à Paris) est la pluie de l'heure qui précède : elle compte pour le 14, pas pour le 15.
+  eq('pluie max : journée du 14 = 15 mm (l’échéance de minuit compte pour le jour qui finit)', r.pluieJourneeMax === 15, String(r.pluieJourneeMax));
+  eq('pluie max : journée du 15 = 30 mm (la commune B)', pluiesMaximales({ t, pluie: [A, B, C] }, '2026-11-15', undefined, maintenant).pluieJourneeMax === 30);
+  eq('pluie max : 24 h glissantes = 30 mm', r.pluie24hMax === 30, String(r.pluie24hMax));
+  eq('pluie max : jusqu’à la fin du run = 30 mm', r.pluieRun === 30, String(r.pluieRun));
+  eq('pluie max : période du 14 au 15 = 34 mm', r.pluiePeriodeMax === 34, String(r.pluiePeriodeMax));
+  eq('pluie max : jour hors échéance = null', pluiesMaximales({ t, pluie: [A, B, C] }, '2026-11-17', undefined, maintenant).pluieJourneeMax === null);
+  eq('pluie max : 3 jours non couverts à 85 % = null', r.pluie3jMax === null);
+  eq('pluie max : sans point = null', pluiesMaximales({ t, pluie: [] }, '2026-11-14', undefined, maintenant).pluieJourneeMax === null);
+  // Période jusqu'à la fin du modèle : AROME (49 échéances, 48 h) ne couvre que 13 h du dernier jour (lundi 16) ; la période s'arrête à sa dernière échéance.
+  eq('pluie max : période du 14 au 16 jusqu’à la fin du modèle = 34 mm', pluiesMaximales({ t, pluie: [A, B, C] }, '2026-11-14', '2026-11-16', maintenant).pluiePeriodeMax === 34);
+  const complete = (rafale: number[], pluieSerie: number[], ts = t) => ({ t: ts, temp: ts.map(() => 5), pluie: pluieSerie, nuages: ts.map(() => 50), direction: ts.map(() => 270), vent: ts.map(() => 40), rafale, orage: ts.map(() => 0), neige: ts.map(() => 0), visibilite: ts.map(() => 10) });
+  const rafales = t.map((x) => (x === '2026-11-16T10:00:00Z' ? 110 : 50));
+  const arome = pointDepuisSerie('30', 'Gard', complete(rafales, serie({ '2026-11-15T10:00:00Z': 30 })), '2026-11-14', '2026-11-16');
+  eq('période AROME du 14 au 16 : rafale de lundi matin prise en compte (110)', arome.rafalePeriode === 110, String(arome.rafalePeriode));
+  eq('période AROME du 14 au 16 : pluie cumulée jusqu’à la fin du modèle (30 mm)', arome.pluiePeriode === 30, String(arome.pluiePeriode));
+  eq('période AROME : fin = dernière échéance (lundi 16, 12 h UTC)', arome.finPeriode === '2026-11-16T12:00:00.000Z', String(arome.finPeriode));
+  // Modèle à longue échéance (96 h) : la couverture minimale de 85 % reste exigée (pas de période tronquée).
+  const t96 = Array.from({ length: 97 }, (_, i) => new Date(Date.parse('2026-11-14T00:00:00Z') + i * 3_600_000).toISOString().replace('.000Z', 'Z'));
+  const longue = pointDepuisSerie('30', 'Gard', complete(t96.map(() => 60), t96.map(() => 0), t96), '2026-11-14', '2026-11-23');
+  eq('période longue non couverte à 85 % = null (inchangé)', longue.rafalePeriode === null && longue.pluiePeriode === null, `${longue.rafalePeriode} / ${longue.pluiePeriode}`);
 }
 
 console.log('Paris 21/12/2026 :', s2.metrics.map((m: any) => m.value).join(' | '), '– durée', s2.headline.value);
