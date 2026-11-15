@@ -25,6 +25,9 @@ import TableauPrevisions, { type CelluleJour, type LigneTableau } from './Tablea
 import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, useFleuves, FICHIERS_CONTOURS } from './CarteMeteo';
 import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from './TexteSurCarte';
+import cheminsPictosSauge from '@/lib/carte-meteo/pictos-sauge.json';
+
+const PICTOS_SAUGE: Record<string, string> = cheminsPictosSauge;
 
 const LARGEUR = 1600;
 const MARGE = 24;
@@ -655,19 +658,19 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                               {enDepartement && vue.echelle >= 1.2 && (
                                 <>
                                   <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={styleSauge ? 0 : 0.55} strokeWidth={4} />
-                                  <path d={fleuves.d3} {...COURS_EAU} stroke={styleSauge ? '#568FC1' : '#2f62c9'} strokeWidth={styleSauge ? 0.9 : 2.2} />
+                                  <path d={fleuves.d3} {...COURS_EAU} stroke={styleSauge ? '#5C92BD' : '#2f62c9'} strokeWidth={styleSauge ? 1.1 : 2.2} />
                                 </>
                               )}
                               {zoneCarte !== 'france' && (
                                 <>
                                   <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={styleSauge ? 0 : 0.55} strokeWidth={vue.echelle >= 1.2 ? 4.8 : 2.2} />
-                                  <path d={fleuves.d2} {...COURS_EAU} stroke={styleSauge ? '#568FC1' : '#2f62c9'} strokeWidth={styleSauge ? 1 : vue.echelle >= 1.2 ? 2.8 : 1.1} />
+                                  <path d={fleuves.d2} {...COURS_EAU} stroke={styleSauge ? '#5C92BD' : '#2f62c9'} strokeWidth={styleSauge ? 1.2 : vue.echelle >= 1.2 ? 2.8 : 1.1} />
                                   <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={styleSauge ? 0 : 0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
-                                  <path d={fleuves.d1} {...COURS_EAU} stroke={styleSauge ? '#568FC1' : '#2a58b8'} strokeWidth={styleSauge ? 1.3 : vue.echelle >= 1.2 ? 3.6 : 1.8} />
+                                  <path d={fleuves.d1} {...COURS_EAU} stroke={styleSauge ? '#5C92BD' : '#2a58b8'} strokeWidth={styleSauge ? 1.55 : vue.echelle >= 1.2 ? 3.6 : 1.8} />
                                 </>
                               )}
                               <path d={fleuves.d0} {...COURS_EAU} stroke="#ffffff" strokeOpacity={styleSauge ? 0 : 0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
-                              <path d={fleuves.d0} {...COURS_EAU} stroke={styleSauge ? '#568FC1' : '#2a58b8'} strokeWidth={styleSauge ? 1.3 : vue.echelle >= 1.2 ? 3.6 : 1.8} />
+                              <path d={fleuves.d0} {...COURS_EAU} stroke={styleSauge ? '#5C92BD' : '#2a58b8'} strokeWidth={styleSauge ? 1.55 : vue.echelle >= 1.2 ? 3.6 : 1.8} />
                             </g>
                           </>
                         )}
@@ -688,12 +691,13 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                     {points.map(({ p, x, y }) => {
                       const cle = `${date}|${p.code}`;
                       const pictoId = surcharges[cle] ?? pictoDuJour(p);
+                      const sourcePicto = pictoId ? cheminPictoImage(selonJeu(pictoId, jeuAlertes)) ?? '' : undefined;
                       const dec = decalages[cle];
                       return (
                       <div key={p.code} style={{ position: 'absolute', left: x, top: y, transform: `${parQuarts ? 'translate(-50%, -50%)' : `translate(-50%, ${-taillePicto / 2}px)`}${dec ? ` translate(${dec[0]}px, ${dec[1]}px)` : ''}`, display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={pictoId ? cheminPictoImage(selonJeu(pictoId, jeuAlertes)) ?? '' : undefined}
+                          src={styleSauge && sourcePicto ? PICTOS_SAUGE[sourcePicto.split('?')[0]] ?? sourcePicto : sourcePicto}
                           alt=""
                           draggable={false}
                           title="Cliquer pour changer le picto, glisser pour déplacer le picto et ses températures"

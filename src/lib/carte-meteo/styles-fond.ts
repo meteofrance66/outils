@@ -33,9 +33,9 @@ export interface DefStyleFond {
 export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
   'mediterranee-sauge': {
     libelle: 'Méditerranée sauge : crème, beige et bleu marine',
-    terre: '#C5CCB7', franceVoisine: '#D9D4C5', mer: '#4384AD',
-    territoire: '#FFF0D2', contour: '#8C927F', voisins: '#B9B8AC',
-    cote: '#D9D4C5', senyera: false, texteMer: '#EAF3F8', epaisseurContour: 1,
+    terre: '#C5CCB7', franceVoisine: '#E5E0D5', mer: '#4384AD',
+    territoire: '#FFF0D2', contour: '#69755E', voisins: '#9DA394',
+    cote: '#E5E0D5', senyera: false, texteMer: '#EAF3F8', epaisseurContour: 1.5,
   },
   bordeaux: { libelle: 'Bordeaux et or uni (mer bleue, territoire crème)', terre: ['#98283a', '#8c2334'], mer: ['#2f6bb0', '#1d4a85'], territoire: '#f8e7c6', contour: '#e8c872', voisins: 'rgba(232,200,114,0.35)', cote: '#e3b64f', senyera: false, texteMer: '#ffffff' },
   azur: { libelle: 'Bleu azur uni (territoire clair)', terre: ['#2d6199', '#295b92'], mer: ['#17406b', '#133860'], territoire: '#e8f1fa', contour: '#ffffff', voisins: 'rgba(255,255,255,0.30)', cote: '#8fb6dc', senyera: false, texteMer: '#dbe9f6' },
