@@ -21,8 +21,13 @@ export const LARGEUR_TABLEAU = 1280;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 const SEUIL_RAFALE = 80;
 
-const jourLong = (dateISO: string) =>
-  new Date(`${dateISO}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).toUpperCase();
+const dateSurDeuxLignes = (dateISO: string) => {
+  const date = new Date(`${dateISO}T12:00:00Z`);
+  return [
+    date.toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'UTC' }).toUpperCase(),
+    date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' }).toUpperCase(),
+  ];
+};
 
 /**
  * Tableau de prévisions (une ligne par région, département ou ville ; par jour : picto, maximale, minimale et rafale), exportable en JPG.
@@ -44,8 +49,8 @@ const TableauPrevisions = forwardRef<HTMLDivElement, { dates: string[]; lignes: 
         <div style={{ display: 'flex', background: '#0a2342', borderRadius: '10px 10px 0 0', fontFamily: POLICE, fontSize: 22, letterSpacing: 0.5 }}>
           <div style={{ width: colonneNom, padding: '10px 14px' }}> </div>
           {dates.map((d) => (
-            <div key={d} style={{ width: largeurJour, padding: '10px 6px', textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.25)' }}>
-              {jourLong(d)}
+            <div key={d} style={{ width: largeurJour, padding: '10px 6px', textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.25)', fontSize: Math.min(22, (largeurJour - 14) / 7), lineHeight: 1.25 }}>
+              {dateSurDeuxLignes(d).map((ligne, i) => <span key={i} style={{ display: 'block', whiteSpace: 'nowrap' }}>{ligne}</span>)}
             </div>
           ))}
         </div>
