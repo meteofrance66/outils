@@ -77,6 +77,7 @@ interface Props {
 export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false, departInitial = 1, logoInitial = 'alertesmeteo' }: Props) {
   const [jeuAlertes, setJeuAlertes] = useJeuAlertes();
   const [dureeChoisie, setDuree] = useState<number>(4);
+  const [nombreVillesTableau, setNombreVillesTableau] = useState(10); // 0 : toutes les villes.
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
   const [departChoisi, setDepart] = useState(departInitial);
   /** Week-end : deux cartes, le samedi et le dimanche à venir (le jour même s'il s'agit d'un samedi). */
@@ -349,12 +350,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
       .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
   }, [zone, parQuarts, enDepartement, dates, jours, donneesDep, codes, jeuAlertes]);
 
+  const lignesTableauAffichees = enDepartement && nombreVillesTableau > 0
+    ? lignesTableau.slice(0, nombreVillesTableau)
+    : lignesTableau;
   const nomZone = parQuarts ? 'France' : zone === 'france' ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : `${DEPARTEMENTS_FR[zone.slice(4)] ?? zone.slice(4)} (${zone.slice(4)})`;
   /** Données du texte automatique : températures maximales des premiers jours de la planche. */
-  const donneesTexte = (): CarteTexte | null => {
+  const donneesTexte = (lignes = lignesTableau): CarteTexte | null => {
     const jourLong = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
     const rubriques = dates.slice(0, 4).flatMap((d, k): RubriqueTexte[] => {
-      const valeurs = lignesTableau.flatMap((l) => (l.cellules[k]?.maxi != null ? [{ lieu: l.nom, valeur: l.cellules[k]!.maxi as number }] : []));
+      const valeurs = lignes.flatMap((l) => (l.cellules[k]?.maxi != null ? [{ lieu: l.nom, valeur: l.cellules[k]!.maxi as number }] : []));
       if (valeurs.length === 0) return [];
       valeurs.sort((a, b) => b.valeur - a.valeur);
       return [{
@@ -772,10 +776,26 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
         </button>
       </div>
       <div className="mt-3">
-        <TexteSurCarte cible={tableauRef} donnees={donneesTexte} />
+        <TexteSurCarte cible={tableauRef} donnees={() => donneesTexte(lignesTableauAffichees)} />
       </div>
+      {enDepartement && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-2">
+            Nombre de villes
+            <select value={nombreVillesTableau} onChange={(e) => setNombreVillesTableau(Number(e.target.value))} className={selectBarre} disabled={enExport}>
+              {Array.from({ length: Math.max(10, lignesTableau.length, nombreVillesTableau) }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+              <option value={0}>Toutes les villes</option>
+            </select>
+          </label>
+          <span className="text-muted" aria-live="polite">
+            {lignesTableauAffichees.length} sur {lignesTableau.length} villes · ordre alphabétique · même sélection dans le JPG
+          </span>
+        </div>
+      )}
       <div className="mt-3 overflow-x-auto">
-        <TableauPrevisions ref={tableauRef} dates={dates} lignes={lignesTableau} titre={titre} sousTitre={sousTitre} logoUrl={logo?.fichier || null} logoFondBlanc={logo?.fondBlanc !== false} />
+        <TableauPrevisions ref={tableauRef} dates={dates} lignes={lignesTableauAffichees} titre={titre} sousTitre={sousTitre} logoUrl={logo?.fichier || null} logoFondBlanc={logo?.fondBlanc !== false} />
       </div>
 
       {choix && (
