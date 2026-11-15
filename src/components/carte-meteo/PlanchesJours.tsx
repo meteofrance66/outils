@@ -270,7 +270,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const hauteur = HAUTEUR_TITRE + lignes * (hauteurCarte + ECART) + HAUTEUR_PIED;
 
   const vue = useMemo(() => {
-    const boite = unirBoites(contours.filter((c) => codes.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
+    let boite = unirBoites(contours.filter((c) => codes.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
+    const departement = zoneCarte === 'dep:66' ? contours.find((c) => c.code === '66') : undefined;
+    if (departement) {
+      // Centrer la surface du territoire sous le bandeau du jour, sans couper ses extrémités.
+      const { x, y } = departement.centreSurface;
+      const demiLargeur = Math.max(x - boite.minX, boite.maxX - x);
+      const demiHauteur = Math.max(y - boite.minY, boite.maxY - y);
+      boite = { minX: x - demiLargeur, maxX: x + demiLargeur, minY: y - demiHauteur, maxY: y + demiHauteur };
+    }
     return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
   }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
   /** Fond de la carte : tuiles de relief ou de photos aériennes (null = fond uni bleu). Automatique : pour un département ou une région seulement. */

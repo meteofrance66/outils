@@ -232,6 +232,7 @@ export const FICHIERS_CONTOURS: Record<'departements' | 'regions', string> = {
 
 interface ContourBoite extends Contour {
   boite: Boite;
+  centreSurface: { x: number; y: number };
   nom: string;
 }
 
@@ -243,8 +244,34 @@ function construireContours(geojson: GeoJsonContours): ContourBoite[] {
   return geojson.features.map((f) => {
     let d = '';
     const boite: Boite = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    let aireTotale = 0;
+    let centreX = 0;
+    let centreY = 0;
     const polygones = (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates) as [number, number][][][];
     for (const polygone of polygones) {
+      // Centre de surface : anneau extérieur positif, trous négatifs, quel que soit leur sens.
+      polygone.forEach((anneau, index) => {
+        const points = anneau.map(([lon, lat]) => versMonde(lat, lon));
+        const origine = points[0];
+        if (!origine) return;
+        let aire = 0;
+        let sx = 0;
+        let sy = 0;
+        points.forEach((p, i) => {
+          const q = points[(i + 1) % points.length];
+          const px = p.x - origine.x, py = p.y - origine.y;
+          const qx = q.x - origine.x, qy = q.y - origine.y;
+          const produit = px * qy - qx * py;
+          aire += produit;
+          sx += (px + qx) * produit;
+          sy += (py + qy) * produit;
+        });
+        if (Math.abs(aire) < 1e-10) return;
+        const poids = Math.abs(aire) * (index === 0 ? 1 : -1);
+        aireTotale += poids;
+        centreX += (origine.x + sx / (3 * aire)) * poids;
+        centreY += (origine.y + sy / (3 * aire)) * poids;
+      });
       for (const anneau of polygone) {
         anneau.forEach(([lon, lat], i) => {
           const { x, y } = versMonde(lat, lon);
@@ -257,7 +284,10 @@ function construireContours(geojson: GeoJsonContours): ContourBoite[] {
         d += 'Z';
       }
     }
-    return { code: f.properties.code, nom: f.properties.nom ?? '', d, boite };
+    const centreSurface = aireTotale > 0
+      ? { x: centreX / aireTotale, y: centreY / aireTotale }
+      : { x: (boite.minX + boite.maxX) / 2, y: (boite.minY + boite.maxY) / 2 };
+    return { code: f.properties.code, nom: f.properties.nom ?? '', d, boite, centreSurface };
   });
 }
 
