@@ -1694,7 +1694,7 @@ export default function VideoWeekEnd({
   const [legendesTexte, setLegendesTexte] = useState('');
   const [soustitresTexte, setSoustitresTexte] = useState('');
   // Voix de synthèse (Azure) : générée à la demande à partir du texte des sous-titres, puis mixée dans le MP4.
-  const [voixId, setVoixId] = useState<(typeof VOIX_CHOIX)[number][0]>('denise');
+  const [voixId, setVoixId] = useState<(typeof VOIX_CHOIX)[number][0]>('remy');
   const [voixVitesse, setVoixVitesse] = useState(1);
   const [voix, setVoix] = useState<{ buffer: AudioBuffer; url: string; texte: string } | null>(null);
   const [voixEnCours, setVoixEnCours] = useState(false);
