@@ -220,6 +220,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   /** Fond de carte : automatique (relief ou photos pour un département ou une région, uni pour la France), uni, relief NASA ou photos IGN. */
   const [fondChoisi, setFondChoisi] = useState<'auto' | 'uni' | Couche>(fondCarteMeteo ? 'relief' : 'auto');
   const [styleFond, setStyleFond] = useState<StyleFond | null>(fondCarteMeteo ? null : 'rouge-or');
+  const styleSauge = styleFond === 'mediterranee-sauge';
   const terresEurope = useTerres(styleFond != null);
   const fin = zonageFin && zone === 'france' && !parQuarts;
   type PointZone = { dep: string; lat: number; lon: number; maxi: number | null };
@@ -576,7 +577,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
               height: hauteur,
               transform: `scale(${facteur})`,
               transformOrigin: 'top left',
-              background: 'linear-gradient(160deg, #0b2a4a 0%, #123c6b 100%)',
+              background: styleSauge ? '#102F4C' : 'linear-gradient(160deg, #0b2a4a 0%, #123c6b 100%)',
               color: '#fff',
               fontFamily: 'Arial, Helvetica, sans-serif',
               position: 'relative',
@@ -588,9 +589,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logo.fichier} alt="" style={{ height: 84, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
               ) : null}
-              <div style={{ background: 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
-                {avecTitre && <div style={{ fontFamily: POLICE, fontSize: 42, lineHeight: 1.05, color: '#0b2a4a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{titre}</div>}
-                <div style={{ fontFamily: POLICE, fontSize: avecTitre ? 22 : 34, color: '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousTitre}</div>
+              <div style={{ background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
+                {avecTitre && <div style={{ fontFamily: POLICE, fontSize: 42, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{titre}</div>}
+                <div style={{ fontFamily: POLICE, fontSize: avecTitre ? 22 : 34, color: styleSauge ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousTitre}</div>
               </div>
             </div>
 
@@ -621,7 +622,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           const point = (enDepartement ? [] : jours[date] ?? []).find((p) => p.code === c.code);
                           const fond = dedans && point?.maxi != null ? palierDe(PALIERS_TEMPERATURE, point.maxi).fond : dedans ? '#6f86d6' : '#061428';
                           // Avec un fond de carte : le territoire est teinté en transparence (le relief reste visible), le reste assombri.
-                          if (styleFond) return <path key={c.code} d={c.d} fill={dedans ? enDepartement ? STYLES_FOND[styleFond].territoire : fond : 'none'} fillOpacity={dedans && !enDepartement ? 0.92 : 1} stroke={dedans ? STYLES_FOND[styleFond].contour : STYLES_FOND[styleFond].voisins} strokeOpacity={1} strokeWidth={(dedans ? 1.6 : 1) / vue.echelle} />;
+                          if (styleFond) return <path key={c.code} d={c.d} fill={dedans ? enDepartement ? STYLES_FOND[styleFond].territoire : fond : 'none'} fillOpacity={dedans && !enDepartement ? 0.92 : 1} stroke={dedans ? STYLES_FOND[styleFond].contour : STYLES_FOND[styleFond].voisins} strokeOpacity={1} strokeWidth={(dedans ? STYLES_FOND[styleFond].epaisseurContour ?? 1.6 : 1) / vue.echelle} />;
                           if (couche && fondCarteMeteo) return <path key={c.code} d={c.d} fill={dedans ? '#8f9ee8' : '#061428'} fillOpacity={dedans ? 0.9 : 0.5} stroke="none" />;
                           if (couche) return <path key={c.code} d={c.d} fill={dedans ? fond : '#061428'} fillOpacity={dedans ? 0.5 : 0.55} stroke="#fff" strokeOpacity={dedans ? 0.9 : 0.25} strokeWidth={(dedans ? 1.4 : 0.7) / vue.echelle} />;
                           return <path key={c.code} d={c.d} fill={fond} fillOpacity={dedans ? 0.88 : 0.4} stroke="#fff" strokeOpacity={dedans ? 0.55 : 0.2} strokeWidth={0.7 / vue.echelle} />;
@@ -653,29 +654,37 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                             <g clipPath={`url(#fleuves-${date})`}>
                               {enDepartement && vue.echelle >= 1.2 && (
                                 <>
-                                  <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={4} />
-                                  <path d={fleuves.d3} {...COURS_EAU} stroke="#2f62c9" strokeWidth={2.2} />
+                                  <path d={fleuves.d3} {...COURS_EAU} stroke="#ffffff" strokeOpacity={styleSauge ? 0 : 0.55} strokeWidth={4} />
+                                  <path d={fleuves.d3} {...COURS_EAU} stroke={styleSauge ? '#568FC1' : '#2f62c9'} strokeWidth={styleSauge ? 0.9 : 2.2} />
                                 </>
                               )}
                               {zoneCarte !== 'france' && (
                                 <>
-                                  <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.55} strokeWidth={vue.echelle >= 1.2 ? 4.8 : 2.2} />
-                                  <path d={fleuves.d2} {...COURS_EAU} stroke="#2f62c9" strokeWidth={vue.echelle >= 1.2 ? 2.8 : 1.1} />
-                                  <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
-                                  <path d={fleuves.d1} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 3.6 : 1.8} />
+                                  <path d={fleuves.d2} {...COURS_EAU} stroke="#ffffff" strokeOpacity={styleSauge ? 0 : 0.55} strokeWidth={vue.echelle >= 1.2 ? 4.8 : 2.2} />
+                                  <path d={fleuves.d2} {...COURS_EAU} stroke={styleSauge ? '#568FC1' : '#2f62c9'} strokeWidth={styleSauge ? 1 : vue.echelle >= 1.2 ? 2.8 : 1.1} />
+                                  <path d={fleuves.d1} {...COURS_EAU} stroke="#ffffff" strokeOpacity={styleSauge ? 0 : 0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
+                                  <path d={fleuves.d1} {...COURS_EAU} stroke={styleSauge ? '#568FC1' : '#2a58b8'} strokeWidth={styleSauge ? 1.3 : vue.echelle >= 1.2 ? 3.6 : 1.8} />
                                 </>
                               )}
-                              <path d={fleuves.d0} {...COURS_EAU} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
-                              <path d={fleuves.d0} {...COURS_EAU} stroke="#2a58b8" strokeWidth={vue.echelle >= 1.2 ? 3.6 : 1.8} />
+                              <path d={fleuves.d0} {...COURS_EAU} stroke="#ffffff" strokeOpacity={styleSauge ? 0 : 0.6} strokeWidth={vue.echelle >= 1.2 ? 6 : 3.2} />
+                              <path d={fleuves.d0} {...COURS_EAU} stroke={styleSauge ? '#568FC1' : '#2a58b8'} strokeWidth={styleSauge ? 1.3 : vue.echelle >= 1.2 ? 3.6 : 1.8} />
                             </g>
                           </>
                         )}
                       </g>
                     </svg>
                     {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={null} bandes={false} />}
-                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: 'rgba(255,255,255,0.94)', color: '#0b2a4a', fontFamily: POLICE, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', color: styleSauge ? '#FFF0D2' : '#0b2a4a', fontFamily: POLICE, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
                       {jourLibelle(date)}
                     </div>
+                    {styleSauge && zoneCarte === 'dep:66' && (
+                      <svg width={largeurCarte} height={hauteurCarte} aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                        <g fontFamily="Arial, Helvetica, sans-serif" fontSize={Math.max(10, Math.min(16, largeurCarte * 0.027))} fontWeight={600} letterSpacing={1.5} textAnchor="middle">
+                          <text x={largeurCarte * 0.48} y={hauteurCarte - 16} fill="#52634F" opacity={0.85}>ESPAGNE</text>
+                          <text x={largeurCarte - 20} y={hauteurCarte * 0.4} transform={`rotate(-90 ${largeurCarte - 20} ${hauteurCarte * 0.4})`} fill="#EAF3F8" opacity={0.85}>MER MÉDITERRANÉE</text>
+                        </g>
+                      </svg>
+                    )}
                     {points.map(({ p, x, y }) => {
                       const cle = `${date}|${p.code}`;
                       const pictoId = surcharges[cle] ?? pictoDuJour(p);
@@ -689,9 +698,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           draggable={false}
                           title="Cliquer pour changer le picto, glisser pour déplacer le picto et ses températures"
                           onPointerDown={(e) => debutPicto(e, cle)}
-                          style={{ width: taillePicto, height: taillePicto, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
+                          style={{ width: taillePicto, height: taillePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
                         />
-                        <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
                           {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: '0.72em' }}>{p.maxi != null ? ' / ' : ''}{Math.round(p.mini)}°</span> : null}
                         </span>
