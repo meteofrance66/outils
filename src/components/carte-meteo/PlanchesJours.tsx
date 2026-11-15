@@ -265,7 +265,11 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   }, [fin, dates, zonesBrutes, contours, modele.id]);
   const colonnes = COLONNES[duree];
   const largeurCarte = (LARGEUR - 2 * MARGE - (colonnes - 1) * ECART) / colonnes;
-  const hauteurCarte = Math.round(largeurCarte * (zoneCarte === 'france' ? 1 : 0.92));
+  // Le 66 est allongé d'ouest en est : un format paysage évite les grandes plages vides
+  // au nord et au sud. Le bandeau du jour conserve sa hauteur pour toutes les durées.
+  const hauteurCarte = zoneCarte === 'dep:66'
+    ? HAUTEUR_JOUR + Math.round(largeurCarte * 0.64)
+    : Math.round(largeurCarte * (zoneCarte === 'france' ? 1 : 0.92));
   const lignes = Math.ceil(duree / colonnes);
   const hauteur = HAUTEUR_TITRE + lignes * (hauteurCarte + ECART) + HAUTEUR_PIED;
 
