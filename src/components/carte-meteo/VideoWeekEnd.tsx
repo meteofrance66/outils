@@ -463,6 +463,8 @@ interface Contexte {
   soustitres?: string[];
   /** Durée de la voix de synthèse (s) : les sous-titres se calent dessus (après 0,3 s de silence) ; sinon ils sont répartis sur toute la vidéo. */
   voixDuree?: number;
+  /** Début de la voix (s) : après l'accroche et l'intro dans les vidéos de prévisions, sinon après un court silence. */
+  voixDebut?: number;
   alerte?: DonneesAlerte;
   tendance12?: DonneesTendance;
 }
@@ -1443,14 +1445,14 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   else if (c.genre === 'tendance' && c.tendance12) dessinerTendance12(ctx, t, c, c.tendance12);
   else dessinerPrevisions(ctx, t, c);
   if (c.legendes && c.legendes.length > 0) dessinerLegendes(ctx, t, dureeVideo(c), c.legendes);
-  if (c.soustitres && c.soustitres.length > 0) dessinerSousTitres(ctx, t, dureeVideo(c), c.soustitres, c.voixDuree);
+  if (c.soustitres && c.soustitres.length > 0) dessinerSousTitres(ctx, t, dureeVideo(c), c.soustitres, c.voixDuree, c.voixDebut);
 }
 
 /**
  * Piste son complète de la vidéo : voix de synthèse (après le petit silence du début) et musique de fond en boucle, volume réduit de moitié
  * sous la voix, avec fondu d'entrée et de sortie. Rendue hors ligne en 48 kHz stéréo.
  */
-async function melangerAudio(voix: AudioBuffer | null, musique: AudioBuffer | null, duree: number, volumeMusique: number): Promise<AudioBuffer> {
+async function melangerAudio(voix: AudioBuffer | null, musique: AudioBuffer | null, duree: number, volumeMusique: number, voixDebut = VOIX_SILENCE): Promise<AudioBuffer> {
   const SR = 48_000;
   const ctx = new OfflineAudioContext(2, Math.ceil(duree * SR), SR);
   if (musique) {
@@ -1470,18 +1472,18 @@ async function melangerAudio(voix: AudioBuffer | null, musique: AudioBuffer | nu
     const source = ctx.createBufferSource();
     source.buffer = voix;
     source.connect(ctx.destination);
-    source.start(VOIX_SILENCE);
+    source.start(voixDebut);
   }
   return ctx.startRendering();
 }
 
 /** Sous-titres automatiques : le texte parlé défile mot à mot en bas de l'écran (groupes de 4 mots), le mot dit est en jaune, gros, avec contour noir. Mots répartis régulièrement sur la durée de la vidéo. */
-function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: number, mots: string[], voixDuree?: number) {
+function dessinerSousTitres(ctx: CanvasRenderingContext2D, t: number, total: number, mots: string[], voixDuree?: number, voixDebut = VOIX_SILENCE) {
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
   // Début de chaque mot : au prorata de sa longueur (plus une pause après la ponctuation) sur la durée de la voix, ou de la vidéo.
-  const debutVoix = voixDuree ? VOIX_SILENCE : 0;
-  const dureeMots = voixDuree ? voixDuree - 0.1 : total;
+  const debutVoix = voixDuree || voixDebut > 1 ? voixDebut : 0;
+  const dureeMots = voixDuree ? voixDuree - voixDebut + 0.2 : total - debutVoix;
   const poids = mots.map((m) => m.replace(/[.,;:!?…]/g, '').length + 1 + (/[.!?…]$/.test(m) ? 3 : /[,;:]$/.test(m) ? 1.5 : 0));
   const somme = poids.reduce((s, p) => s + p, 0);
   const departs: number[] = [];
@@ -1993,7 +1995,9 @@ export default function VideoWeekEnd({
   const soustitres = soustitresTexte.split(/\s+/).filter(Boolean);
   // La voix générée ne vaut que pour le texte avec lequel elle a été faite.
   const voixValide = voix && voix.texte === soustitres.join(' ') ? voix : null;
-  const voixDuree = voixValide ? voixValide.buffer.duration + VOIX_SILENCE : undefined;
+  // Vidéo de prévisions : la voix (et les sous-titres) démarrent après la présentation (accroche puis intro), pas pendant.
+  const voixDebut = genre === 'previsions' ? (avecHook ? DUREE_HOOK : 0) + DUREE_INTRO + VOIX_SILENCE : VOIX_SILENCE;
+  const voixDuree = voixValide ? voixValide.buffer.duration + voixDebut : undefined;
   async function genererVoix() {
     setVoixErreur(null);
     setVoixEnCours(true);
@@ -2036,7 +2040,7 @@ export default function VideoWeekEnd({
     }
   }
   /** Contexte des vidéos sans prévisions de villes (alerte, tendance) : aucune ville ni semaine. */
-  const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes, soustitres, voixDuree };
+  const base = { semaine: { jours: [], villes: {} } as Semaine, villes: [] as string[], textes: { intro: ['', ''], sous: '', bandeau: '', recap: '' } as Contexte['textes'], logo, departement: nomDepartement, codeDep: dep, abonne, legendes, soustitres, voixDuree, voixDebut };
   const contexte: Contexte | null =
     genre === 'alerte'
       ? { ...base, genre, alerte: { entete: saisies.entete ?? autoAlerte.entete, titre: saisies.titre ?? autoAlerte.titre, periode: saisies.periode ?? autoAlerte.periode, detail: saisies.detail ?? '', types: pictosAlerte, carte: carteAlerte } }
@@ -2045,7 +2049,7 @@ export default function VideoWeekEnd({
           ? { ...base, genre, tendance12 }
           : null
         : semaine && villes.length >= 1
-          ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions, genre, abonne, legendes, soustitres, voixDuree }
+          ? { semaine, villes, logo, departement: nomDepartement, textes, hook: avecHook, carte: carteDansVideo, tendance, codeDep: dep, positions, genre, abonne, legendes, soustitres, voixDuree, voixDebut }
           : null;
   const total = contexte ? dureeVideo(contexte) : 0;
 
@@ -2067,11 +2071,11 @@ export default function VideoWeekEnd({
     if (voixValide) {
       const audio = new Audio(voixValide.url);
       voixLue = audio;
-      if (t >= VOIX_SILENCE) {
-        audio.currentTime = t - VOIX_SILENCE;
+      if (t >= voixDebut) {
+        audio.currentTime = t - voixDebut;
         void audio.play().catch(() => {});
       } else {
-        minuteurVoix = window.setTimeout(() => void audio.play().catch(() => {}), (VOIX_SILENCE - t) * 1000);
+        minuteurVoix = window.setTimeout(() => void audio.play().catch(() => {}), (voixDebut - t) * 1000);
       }
     }
     let musiqueLue: HTMLAudioElement | null = null;
@@ -2146,7 +2150,7 @@ export default function VideoWeekEnd({
         }
         await sortie.start();
         if (sourceAudio) {
-          await sourceAudio.add(await melangerAudio(voixValide?.buffer ?? null, musique?.buffer ?? null, total, musiqueVolume));
+          await sourceAudio.add(await melangerAudio(voixValide?.buffer ?? null, musique?.buffer ?? null, total, musiqueVolume, voixDebut));
           sourceAudio.close();
         }
         const nb = Math.round(total * FPS);
@@ -2196,7 +2200,7 @@ export default function VideoWeekEnd({
     } finally {
       setEtat(null);
     }
-  }, [contexte, total, jours, dep, format, voixValide, musique, musiqueVolume, soustitres.length]);
+  }, [contexte, total, jours, dep, format, voixValide, musique, musiqueVolume, soustitres.length, voixDebut]);
 
   // Texte d'accompagnement (légende du post) rédigé par l'IA à partir des mêmes données que la vidéo.
   const [texteIA, setTexteIA] = useState('');
@@ -2584,7 +2588,7 @@ export default function VideoWeekEnd({
                 <audio controls src={voixValide.url} className="w-full" />
                 <span className="text-xs text-muted">
                   Voix de {voixValide.buffer.duration.toFixed(1).replace('.', ',')} s : les sous-titres sont calés dessus, elle est jouée avec l’aperçu (bouton Lecture) et ajoutée au MP4.
-                  {voixValide.buffer.duration + VOIX_SILENCE > total && ' Attention : elle dépasse la durée de la vidéo, elle sera coupée.'}
+                  {voixValide.buffer.duration + voixDebut > total && ' Attention : elle dépasse la durée de la vidéo, elle sera coupée.'}
                 </span>
               </>
             )}
