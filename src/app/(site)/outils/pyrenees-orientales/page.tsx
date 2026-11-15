@@ -64,7 +64,7 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
       </div>
 
       <div id="planche" className="mt-12 scroll-mt-4">
-        <PlanchesJours aujourdhui={aujourdhui} modele={{ id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' }} jours={{}} zoneInitiale={`dep:${DEPARTEMENT}`} departInitial={2} logoInitial="pays-catalan-hd" />
+        <PlanchesJours aujourdhui={aujourdhui} modele={{ id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' }} jours={{}} zoneInitiale={`dep:${DEPARTEMENT}`} departInitial={2} logoInitial="pays-catalan-hd" styleInitial="mediterranee-sauge" />
       </div>
 
       <h2 id="infos" className="mt-12 scroll-mt-4 text-2xl font-extrabold">

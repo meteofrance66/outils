@@ -29,6 +29,13 @@ import cheminsPictosSauge from '@/lib/carte-meteo/pictos-sauge.json';
 
 const PICTOS_SAUGE: Record<string, string> = cheminsPictosSauge;
 
+/** Coordonnées des communes du jeu local public/climat/communes/66.json. */
+const REPERES_66 = [
+  { nom: 'Perpignan', lat: 42.698, lon: 2.889 },
+  { nom: 'Font-Romeu', lat: 42.505, lon: 2.029 },
+  { nom: 'Le Boulou', lat: 42.528, lon: 2.830 },
+];
+
 const LARGEUR = 1600;
 const MARGE = 24;
 const ECART = 14;
@@ -68,13 +75,15 @@ interface Props {
   departInitial?: number;
   /** Logo choisi d'office (identifiant de LOGOS_PRESETS). */
   logoInitial?: string;
+  /** Style choisi à l'ouverture de la page. */
+  styleInitial?: StyleFond;
 }
 
 /**
  * Planches « jours » : un seul JPG avec une carte par jour (2 cartes pour 2 jours, 4 pour 4… 16 pour 16 jours), pour la France, une
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
-export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false, departInitial = 1, logoInitial = 'alertesmeteo' }: Props) {
+export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false, departInitial = 1, logoInitial = 'alertesmeteo', styleInitial }: Props) {
   const [jeuAlertes, setJeuAlertes] = useJeuAlertes();
   const [dureeChoisie, setDuree] = useState<number>(4);
   const [nombreVillesTableau, setNombreVillesTableau] = useState(10); // 0 : toutes les villes.
@@ -223,7 +232,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [zonageFin, setZonageFin] = useState(false);
   /** Fond de carte : automatique (relief ou photos pour un département ou une région, uni pour la France), uni, relief NASA ou photos IGN. */
   const [fondChoisi, setFondChoisi] = useState<'auto' | 'uni' | Couche>(fondCarteMeteo ? 'relief' : 'auto');
-  const [styleFond, setStyleFond] = useState<StyleFond | null>(fondCarteMeteo ? null : 'rouge-or');
+  const [styleFond, setStyleFond] = useState<StyleFond | null>(styleInitial ?? (fondCarteMeteo ? null : 'rouge-or'));
   const styleSauge = styleFond === 'mediterranee-sauge';
   const terresEurope = useTerres(styleFond != null);
   const fin = zonageFin && zone === 'france' && !parQuarts;
@@ -594,7 +603,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
             <div style={{ height: HAUTEUR_TITRE, display: 'flex', alignItems: 'center', gap: 24, padding: `0 ${MARGE}px` }}>
               {logo?.fichier ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo.fichier} alt="" style={{ height: 84, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
+                <img src={logo.fichier} alt="" style={{ height: zoneCarte === 'dep:66' ? 84 * 1.15 : 84, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
               ) : null}
               <div style={{ background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
                 {avecTitre && <div style={{ fontFamily: POLICE, fontSize: 42, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{titre}</div>}
@@ -750,6 +759,14 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                       </div>
                       );
                     })}
+                    {zoneCarte === 'dep:66' && contours.some((c) => c.code === '66') && (
+                      <svg width={largeurCarte} height={hauteurCarte} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} role="img" aria-label="Repères : Perpignan, Font-Romeu et Le Boulou">
+                        {REPERES_66.map((ville) => {
+                          const { x, y } = versEcran(versMonde(ville.lat, ville.lon), vue);
+                          return <circle key={ville.nom} cx={x} cy={y} r={Math.max(2.5, Math.min(4, largeurCarte * 0.006))} fill="#000" stroke="#FFF0D2" strokeWidth={0.8}><title>{ville.nom}</title></circle>;
+                        })}
+                      </svg>
+                    )}
                     {premier == null && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cfe3fa', fontSize: 16, textAlign: 'center', padding: 20 }}>
                         {!charge ? 'Chargement…' : vide ? 'Pas encore de prévision pour ce jour' : ''}
