@@ -2,7 +2,7 @@
  * Styles de fond de la carte (option « Style de fond ») : fond uni ou dégradé, territoire coloré, mer toujours dessinée.
  * Les couleurs sont des attributs SVG (pas de CSS) pour passer dans l'export JPG.
  */
-export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'rouge-or-doux' | 'rouge-or-or' | 'rouge-or-rouge' | 'rouge-or-inverse' | 'rouge-or-territoire-rouge' | 'rouge-or-senyera' | 'parchemin' | 'marine-creme' | 'marine-bleu' | 'epure';
+export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'rouge-or-catalan' | 'rouge-or-mediterranee' | 'rouge-or-pastel' | 'rouge-or-doux' | 'rouge-or-or' | 'rouge-or-rouge' | 'rouge-or-inverse' | 'rouge-or-territoire-rouge' | 'rouge-or-senyera' | 'parchemin' | 'marine-creme' | 'marine-bleu' | 'epure';
 
 /** Une couleur, ou un dégradé en diagonale (haut gauche vers bas droit). */
 export type Peinture = string | [string, string];
@@ -11,6 +11,8 @@ export interface DefStyleFond {
   libelle: string;
   /** Fond : tout ce qui n'est pas la mer (étranger, départements voisins). */
   terre: Peinture;
+  /** Couleurs géographiques des voisins, sous la couche du territoire sélectionné. */
+  departementsVoisins?: Record<string, string>;
   mer: Peinture;
   /** Remplissage du territoire sélectionné. */
   territoire: string;
@@ -42,6 +44,24 @@ export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
   'bleu-nuit': { libelle: 'Fond bleu nuit', terre: ['#12304f', '#0a1f36'], mer: ['#1c5f8a', '#0f3d62'], territoire: '#5b9bd5', contour: '#ffffff', voisins: '#38597b', cote: '#3b84b0', senyera: false, texteMer: '#e6f2fa' },
   creme: { libelle: 'Crème et senyera (territoire bleu-gris)', terre: ['#fbefd9', '#f1d5a8'], mer: ['#a6d4ea', '#5aa7d6'], territoire: '#52689a', contour: '#ffffff', voisins: '#dcc3a0', cote: '#ffffff', senyera: true, texteMer: '#ffffff' },
   'rouge-or': { libelle: 'Rouge et or 1 : classique (mer bleue, territoire crème)', terre: ['#b98a2e', '#7a1c2a'], mer: ['#2f6bc0', '#173f86'], territoire: '#fbeccb', contour: '#f6e3b0', voisins: 'rgba(246,227,176,0.30)', cote: '#e3b64f', senyera: true, texteMer: '#ffffff' },
+  'rouge-or-catalan': {
+    libelle: 'Rouge et or 1A : Éclat catalan (Espagne grenat, Aude or, Ariège sauge)',
+    terre: '#963e49', departementsVoisins: { '11': '#d3ad60', '09': '#8caa96' },
+    mer: ['#3989bd', '#194f88'], territoire: '#fff0cf', contour: '#fff9e9',
+    voisins: '#f2dfb5', cote: '#f5d68b', senyera: true, texteMer: '#ffffff',
+  },
+  'rouge-or-mediterranee': {
+    libelle: 'Rouge et or 1B : Méditerranée (Espagne terre cuite, Aude miel, Ariège olive)',
+    terre: '#b77561', departementsVoisins: { '11': '#e1c38b', '09': '#939d78' },
+    mer: ['#54b5c6', '#287b9f'], territoire: '#fff3db', contour: '#fffdf4',
+    voisins: '#f7ead3', cote: '#fff3d6', senyera: true, texteMer: '#ffffff',
+  },
+  'rouge-or-pastel': {
+    libelle: 'Rouge et or 1C : Atlas pastel (Espagne rose, Aude champagne, Ariège vert doux)',
+    terre: '#d7ada6', departementsVoisins: { '11': '#e9d5aa', '09': '#b4c8b8' },
+    mer: ['#98cce0', '#629fc4'], territoire: '#fff8e8', contour: '#8d6947',
+    voisins: '#fff5df', cote: '#fff8e8', senyera: true, texteMer: '#214f70',
+  },
   'rouge-or-doux': { libelle: 'Rouge et or 2 : dégradé doux (mer bleue, territoire crème)', terre: ['#c49632', '#a8602c'], mer: ['#2f6bc0', '#173f86'], territoire: '#fbeccb', contour: '#fff3d6', voisins: 'rgba(255,243,214,0.35)', cote: '#fff3d6', senyera: false, texteMer: '#ffffff' },
   'rouge-or-or': { libelle: 'Rouge et or 3 : or uni (territoire rouge)', terre: ['#d8a93c', '#c8962f'], mer: ['#2f6bc0', '#173f86'], territoire: '#b3202f', contour: '#fff3d6', voisins: 'rgba(120,80,10,0.30)', cote: '#fff3d6', senyera: false, texteMer: '#ffffff' },
   'rouge-or-rouge': { libelle: 'Rouge et or 4 : rouge uni (territoire or pâle)', terre: ['#a82233', '#951d2d'], mer: ['#2f6bc0', '#173f86'], territoire: '#f6dd9a', contour: '#ffffff', voisins: 'rgba(255,255,255,0.30)', cote: '#ffffff', senyera: false, texteMer: '#ffffff' },

@@ -168,6 +168,10 @@ export function FondStyleSvg({ style, vue, largeur, hauteur, terres, departement
       <g mask={`url(#${id}-masque)`}>
         <path d={anneaux.map((a) => a.d).join('')} fill={remplir('terre', def.terre)} />
       </g>
+      {/* Les limites IGN séparent les trois couleurs, sans découpage approximatif du fond. */}
+      {def.departementsVoisins && departements.map((c) => def.departementsVoisins?.[c.code] ? (
+        <path key={`voisin-${c.code}`} d={c.d} fill={def.departementsVoisins[c.code]} stroke={def.voisins} strokeWidth={1} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      ) : null)}
       {/* Frontières Natural Earth (1:50 m) : masquées le long des contours des départements, qui les dessinent déjà plus précisément
           (sinon une seconde ligne, légèrement décalée, double le contour). Seules restent celles qui ne sont pas des contours français. */}
       <mask id={`${id}-front`} maskUnits="userSpaceOnUse" x={x0 - 1} y={y0 - 1} width={w + 2} height={h + 2}>
