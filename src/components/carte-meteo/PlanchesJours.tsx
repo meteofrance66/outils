@@ -61,17 +61,21 @@ interface Props {
   zoneInitiale?: string;
   /** Fond des autres cartes (relief satellite NASA, territoire violet uni, reste assombri) au lieu du style « rouge et or ». */
   fondCarteMeteo?: boolean;
+  /** Premier jour choisi d'office : 0 = aujourd'hui, 1 = demain (par défaut), 2 = J2… */
+  departInitial?: number;
+  /** Logo choisi d'office (identifiant de LOGOS_PRESETS). */
+  logoInitial?: string;
 }
 
 /**
  * Planches « jours » : un seul JPG avec une carte par jour (2 cartes pour 2 jours, 4 pour 4… 16 pour 16 jours), pour la France, une
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
-export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false }: Props) {
+export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false, departInitial = 1, logoInitial = 'alertesmeteo' }: Props) {
   const [jeuAlertes, setJeuAlertes] = useJeuAlertes();
   const [dureeChoisie, setDuree] = useState<number>(4);
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
-  const [departChoisi, setDepart] = useState(1);
+  const [departChoisi, setDepart] = useState(departInitial);
   /** Week-end : deux cartes, le samedi et le dimanche à venir (le jour même s'il s'agit d'un samedi). */
   const [weekEnd, setWeekEnd] = useState(false);
   const jourSemaine = new Date(`${aujourdhui}T12:00:00Z`).getUTCDay(); // 0 = dimanche … 6 = samedi
@@ -98,6 +102,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   /** Grosseur de la pastille de rafale (%), plus petite par défaut. */
   const [risques, setRisques] = useState(true);
   const [tailleRafale, setTailleRafale] = useState(70);
+  /** Taille des pictos, en pourcentage de la taille automatique. */
+  const [tailleIcones, setTailleIcones] = useState(100);
   /** Rafale (km/h) à partir de laquelle la pastille de vent s'ajoute au picto. */
   const [seuilRafale, setSeuilRafale] = useState(80);
   const [periode, setPeriode] = useState<PeriodePlanche>('journee');
@@ -105,7 +111,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [avecTitre, setAvecTitre] = useState(true);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState(zoneInitiale);
-  const [logoId, setLogoId] = useState('alertesmeteo');
+  const [logoId, setLogoId] = useState(logoInitial);
   const fleuves = useFleuves(true);
   const [donneesDepBrutes, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
   // Valeurs du moment choisi (matin, après-midi…) : pictos, températures, rafales et tableau suivent la période.
@@ -272,7 +278,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const merVisible = useMemo(() => (styleFond ? positionMer(terresEurope, vue, largeurCarte, hauteurCarte) : null), [styleFond, terresEurope, vue, largeurCarte, hauteurCarte]);
 
   const partDetail = niveauDetail === NIVEAU_QUATRE_PICTOS ? 0.22 : (NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1);
-  const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 2.6 : 1);
+  const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 2.6 : 1) * (tailleIcones / 100);
   // Moins il y a de points, plus les pictos grossissent (jusqu'à environ deux fois au niveau 4).
   const taillePicto = tailleBase * (parQuarts ? 1 : 1 / Math.sqrt(partDetail));
   /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
@@ -438,6 +444,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
               </option>
             ))}
           </select>
+        </label>
+        <label className="text-sm font-medium">
+          <span className="mb-1 block">Taille des pictos : {tailleIcones} %</span>
+          <input type="range" min={50} max={200} step={5} value={tailleIcones} onChange={(e) => setTailleIcones(Number(e.target.value))} className="block w-40" aria-label="Taille des pictos en pourcentage" />
         </label>
         <label className="text-sm font-medium">
           <span className="mb-1 block">Taille des rafales : {tailleRafale} %</span>
