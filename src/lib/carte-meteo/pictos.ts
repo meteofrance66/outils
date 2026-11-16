@@ -150,7 +150,7 @@ export interface PictoAlertes extends PictoImage {
 export const PICTOS_ALERTES: PictoAlertes[] = ICONES_ALERTES.map(([nom, label, categorie, motsCles]) => ({
   id: `am:${nom}`,
   // ?v= : à augmenter quand un SVG change, pour passer outre le cache des navigateurs (1 h + 1 jour).
-  fichier: `/pictos-alertes/${nom}.svg?v=6`,
+  fichier: `/pictos-alertes/${nom}.svg?v=7`,
   label,
   categorie,
   motsCles,
@@ -159,7 +159,7 @@ export const PICTOS_ALERTES: PictoAlertes[] = ICONES_ALERTES.map(([nom, label, c
 /** Icônes Alertes-meteo-Pro : les mêmes icônes, contour sombre épais et couleurs franches (voir scripts/pictos-pro.mjs). */
 export const PICTOS_ALERTES_PRO: PictoAlertes[] = ICONES_ALERTES.map(([nom, label, categorie, motsCles]) => ({
   id: `ap:${nom}`,
-  fichier: `/pictos-alertes-pro/${nom}.svg?v=1`,
+  fichier: `/pictos-alertes-pro/${nom}.svg?v=2`,
   label,
   categorie,
   motsCles,
