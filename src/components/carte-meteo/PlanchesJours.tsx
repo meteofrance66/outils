@@ -8,7 +8,7 @@ import { PALIERS_TEMPERATURE, palierDe } from '@/lib/carte-meteo/cartes-info';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
 import { REGIONS_FR, REGION_PAR_DEPARTEMENT } from '@/lib/carte-meteo/regions-fr';
 import { NIVEAUX_DETAIL } from '@/lib/carte-meteo/niveaux-detail';
-import { cheminPictoImage, estPictoImage } from '@/lib/carte-meteo/pictos';
+import { cheminPictoImage, estPictoImage, estPictoNeige } from '@/lib/carte-meteo/pictos';
 import { selonJeu, useJeuAlertes } from '@/lib/carte-meteo/jeu-alertes';
 import ChoixJeuAlertes from './ChoixJeuAlertes';
 import { angleFleche, couleurRafale } from '@/lib/carte-meteo/vent';
@@ -136,6 +136,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [facteur, setFacteur] = useState(1);
   // Pictos changés ou déplacés à la main, par « date|code » ('' = retiré).
   const [surcharges, setSurcharges] = useState<Record<string, string>>({});
+  const [lpns, setLpns] = useState<Record<string, string>>({});
   const [decalages, setDecalages] = useState<Record<string, [number, number]>>({});
   const [choix, setChoix] = useState<string | null>(null);
   const [partout, setPartout] = useState(false);
@@ -589,8 +590,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
 
       <p className="mt-2 text-sm text-muted">
         Cliquez sur un picto pour le changer, glissez-le pour le déplacer.{' '}
-        {(Object.keys(surcharges).length > 0 || Object.keys(decalages).length > 0) && (
-          <button type="button" className="underline" onClick={() => { setSurcharges({}); setDecalages({}); }}>
+        {(Object.keys(surcharges).length > 0 || Object.keys(decalages).length > 0 || Object.keys(lpns).length > 0) && (
+          <button type="button" className="underline" onClick={() => { setSurcharges({}); setDecalages({}); setLpns({}); }}>
             Rétablir les pictos d&apos;origine
           </button>
         )}
@@ -729,6 +730,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           onPointerDown={(e) => debutPicto(e, cle)}
                           style={{ width: taillePicto, height: taillePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
                         />
+                        {pictoId && estPictoNeige(pictoId) && lpns[cle] && (
+                          <span style={{ fontFamily: policeValeurs, fontWeight: 700, fontSize: Math.max(12, Math.round(taillePicto * 0.22)), color: '#0c4a6e', background: '#f0f9ff', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>LPN : {lpns[cle]} m</span>
+                        )}
                         <span style={{ fontFamily: policeValeurs, fontWeight: typoModerne ? 800 : undefined, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
                           {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: typoModerne ? '0.8em' : '0.72em' }}>{p.maxi != null ? ' / ' : ''}{Math.round(p.mini)}°</span> : null}
@@ -836,6 +840,20 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
             onChoisir={(id) => estPictoImage(id) && appliquer(id)}
             entete={
               <div className="flex flex-col gap-1 text-xs">
+                <label className="flex items-center gap-2">
+                  LPN de ce point (m)
+                  <input type="number" min={0} max={9000} step={100} placeholder="Non renseignée" value={lpns[choix] ?? ''} className="w-32 rounded border border-border bg-surface p-1" onChange={(e) => {
+                    const valeur = e.target.value;
+                    if (!/^\d{0,4}$/.test(valeur) || Number(valeur) > 9000) return;
+                    setLpns((actuelles) => {
+                      const suivantes = { ...actuelles };
+                      if (valeur) suivantes[choix] = valeur;
+                      else delete suivantes[choix];
+                      return suivantes;
+                    });
+                  }} />
+                </label>
+                <span className="text-muted">Affichée uniquement sous un picto de neige. Vide : aucune altitude indiquée.</span>
                 <label className="flex items-center gap-1.5">
                   <input type="checkbox" checked={partout} onChange={(e) => setPartout(e.target.checked)} />
                   Remplacer ce picto sur tous les jours
