@@ -299,7 +299,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const [altitudeMax, setAltitudeMax] = useState(ALTITUDE_MAX_DEFAUT);
   /** Thème affiché (« tous » : toutes les cartes de la catégorie, rangées par thème). */
   // Un thème à la fois (plus de « tous les thèmes ») : « L'essentiel » d'abord (Climat, qui n'en a pas, prend son premier thème).
-  const [groupeChoisi, setGroupeChoisi] = useState(uneCarte ? 'Températures' : ESSENTIEL);
+  const [groupeChoisi, setGroupeChoisi] = useState(uneCarte ? 'Températures' : modeInitial === 'alertes' ? GROUPE_RISQUES : ESSENTIEL);
   /** Danger affiché dans le thème « Risques » : orages, pluies, vent, neige, verglas… */
   const [dangerChoisi, setDangerChoisi] = useState(DANGERS[0].id);
   const [carteChoisie, setCarteChoisie] = useState(uneCarte ? 'tmax' : '');
@@ -1009,6 +1009,26 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               </a>
             </div>
           </fieldset>
+          {!uneCarte && (mode === 'prevision' || mode === 'bilan') && (
+            <fieldset className="w-full rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <legend className="px-1 text-sm font-bold">Thèmes météo</legend>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+                {DANGERS.map((d) => {
+                  const actif = mode === 'prevision' ? groupeChoisi === GROUPE_RISQUES && dangerChoisi === d.id : groupeChoisi === `danger:${d.id}`;
+                  return <button
+                    key={d.id}
+                    type="button"
+                    aria-pressed={actif}
+                    onClick={() => {
+                      setDangerChoisi(d.id);
+                      setGroupeChoisi(mode === 'prevision' ? GROUPE_RISQUES : `danger:${d.id}`);
+                    }}
+                    className={`rounded-lg border px-2 py-2.5 text-sm font-bold transition-colors ${actif ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-text hover:border-primary'}`}
+                  >{d.picto} {d.libelle}</button>;
+                })}
+              </div>
+            </fieldset>
+          )}
           <fieldset className={uneCarte ? 'lg:col-span-3' : undefined}>
             <legend className={legende}>Zone</legend>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
@@ -1275,23 +1295,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           )}
           {!uneCarte && mode === 'prevision' && groupeChoisi === GROUPE_RISQUES && (
             <fieldset>
-              <legend className={`${legende} !text-red-600`}>Risque</legend>
+              <legend className={`${legende} !text-red-600`}>Échéance de l’alerte</legend>
               <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Échéance des alertes">
                 {[0, 1, 2, 3, 4, 5].map((j) => <button key={j} type="button" aria-pressed={alerteParJour && jour === j} onClick={() => { changerJour(j); setAlerteParJour(true); }} className={`rounded-lg border px-3 py-1 text-sm font-bold ${alerteParJour && jour === j ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>J{j}</button>)}
                 <button type="button" aria-pressed={!alerteParJour} onClick={() => setAlerteParJour(false)} className={`rounded-lg border px-3 py-1 text-sm font-bold ${!alerteParJour ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>Toutes les périodes</button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {DANGERS.map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    aria-pressed={dangerChoisi === d.id}
-                    onClick={() => setDangerChoisi(d.id)}
-                    className={`rounded-full border-2 px-3 py-1 text-sm font-bold ${dangerChoisi === d.id ? 'border-red-600 bg-red-600 text-white' : 'border-red-600 bg-surface text-red-600'}`}
-                  >
-                    {d.picto} {d.libelle}
-                  </button>
-                ))}
               </div>
             </fieldset>
           )}
