@@ -1010,9 +1010,14 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
             </div>
           </fieldset>
           {!uneCarte && (mode === 'prevision' || mode === 'bilan') && (
-            <fieldset className="w-full rounded-xl border border-primary/20 bg-primary/5 p-3">
-              <legend className="px-1 text-sm font-bold">Thèmes météo</legend>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+            <div className="w-full space-y-2" role="group" aria-label="Sélection météo">
+              {mode === 'prevision' && <div className="flex flex-wrap gap-1.5" role="group" aria-label="Échéance des alertes">
+                {[0, 1, 2, 3, 4, 5].map((j) => <button key={j} type="button" aria-pressed={alerteParJour && jour === j} onClick={() => { changerJour(j); setAlerteParJour(true); setGroupeChoisi(GROUPE_RISQUES); }} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${alerteParJour && jour === j ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>J{j}</button>)}
+                <button type="button" aria-pressed={!alerteParJour} onClick={() => { setAlerteParJour(false); setGroupeChoisi(GROUPE_RISQUES); }} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${!alerteParJour ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>Toutes les périodes</button>
+              </div>}
+              <fieldset>
+              <legend className="sr-only">Thèmes météo</legend>
+              <div className="flex flex-wrap gap-1.5">
                 {DANGERS.map((d) => {
                   const actif = mode === 'prevision' ? groupeChoisi === GROUPE_RISQUES && dangerChoisi === d.id : groupeChoisi === `danger:${d.id}`;
                   return <button
@@ -1023,11 +1028,12 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                       setDangerChoisi(d.id);
                       setGroupeChoisi(mode === 'prevision' ? GROUPE_RISQUES : `danger:${d.id}`);
                     }}
-                    className={`rounded-lg border px-2 py-2.5 text-sm font-bold transition-colors ${actif ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-text hover:border-primary'}`}
+                    className={`rounded-full border-2 px-3 py-1 text-base font-bold transition-colors ${actif ? 'border-red-600 bg-red-600 text-white' : 'border-red-600 bg-surface text-red-600 hover:bg-red-50'}`}
                   >{d.picto} {d.libelle}</button>;
                 })}
               </div>
-            </fieldset>
+              </fieldset>
+            </div>
           )}
           <fieldset className={uneCarte ? 'lg:col-span-3' : undefined}>
             <legend className={legende}>Zone</legend>
@@ -1292,15 +1298,6 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               ))}
             </select>
           </label>
-          )}
-          {!uneCarte && mode === 'prevision' && groupeChoisi === GROUPE_RISQUES && (
-            <fieldset>
-              <legend className={`${legende} !text-red-600`}>Échéance de l’alerte</legend>
-              <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Échéance des alertes">
-                {[0, 1, 2, 3, 4, 5].map((j) => <button key={j} type="button" aria-pressed={alerteParJour && jour === j} onClick={() => { changerJour(j); setAlerteParJour(true); }} className={`rounded-lg border px-3 py-1 text-sm font-bold ${alerteParJour && jour === j ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>J{j}</button>)}
-                <button type="button" aria-pressed={!alerteParJour} onClick={() => setAlerteParJour(false)} className={`rounded-lg border px-3 py-1 text-sm font-bold ${!alerteParJour ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>Toutes les périodes</button>
-              </div>
-            </fieldset>
           )}
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`}>
             <span className={legende}>Logo</span>
