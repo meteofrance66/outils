@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { THEMES_PREVISION } from '../src/lib/carte-meteo/cartes-info';
 import { versMonde } from '../src/lib/carte-meteo/projection-france';
 import { lisserContoursZones } from '../src/lib/carte-meteo/lissage-zones';
-import { reglesPaliers, texteFourchetteTheme, texteLocalTheme } from '../src/lib/carte-meteo/zones-fourchettes';
+import { calculerZones, reglesPaliers, texteFourchetteTheme, texteLocalTheme } from '../src/lib/carte-meteo/zones-fourchettes';
+import { estPluiePro, habillerPluiePro, PALETTE_PLUIE_PRO, plagePluie } from '../src/lib/carte-meteo/pluie-pro';
 
 // --- Fourchettes : toujours de 5 en 5 mm, de 10 en 10 km/h ---------------------------------------------------------------
 const theme = (id: string) => {
@@ -49,6 +50,30 @@ const contours = geojson.features.map((f) => {
     }
   return { code: f.properties.code, d };
 });
+
+// Pluie Pro : mêmes zones et centres ; bornes des données, seuils du thème, aucun cumul inventé.
+const risquePluie = { ...theme('risque-pluie'), ...theme('risque-pluie').brut!, texteValeur: undefined };
+assert.ok(estPluiePro(risquePluie));
+assert.ok(!estPluiePro(theme('risque-pluie')), 'ne jamais interpréter des niveaux de risque comme des mm');
+assert.ok(!estPluiePro(theme('risque-verglas')));
+assert.equal(plagePluie(70, 70), '70 à 70 mm');
+assert.equal(plagePluie(0, 0), '0 à 0 mm');
+assert.equal(plagePluie(0.2, 0.8), '0,2 à 0,8 mm');
+const cumuls = Object.fromEntries(contours.map((c, i) => [c.code, [0, 15, 25, 35, 55, 65, 95, 110, 140][i % 9]]));
+const origine = calculerZones(contours, cumuls, 'desc', reglesPaliers(risquePluie, Object.values(cumuls)));
+const avantHabillage = JSON.stringify(origine);
+const pro = habillerPluiePro(risquePluie, origine, cumuls);
+assert.equal(JSON.stringify(origine), avantHabillage, 'aucune mutation des zones originales');
+assert.deepEqual(pro.zones.map((z) => [z.cle, z.centre, z.departements]), origine.map((z) => [z.cle, z.centre, z.departements]));
+assert.deepEqual(pro.legende.map((p) => p.couleur), PALETTE_PLUIE_PRO);
+assert.deepEqual(pro.legende.map((p) => p.texte), ['10 à < 30 mm', '30 à < 60 mm', '60 à < 100 mm', '100 à 140 mm']);
+for (const z of pro.zones) {
+  const valeurs = z.departements.filter((d) => d !== z.local?.departement).map((d) => cumuls[d]).filter(Number.isFinite);
+  assert.equal(z.min, Math.min(...valeurs));
+  assert.equal(z.max, Math.max(...valeurs));
+  if (z.local) assert.equal(z.local.valeur, cumuls[z.local.departement]);
+}
+assert.equal(habillerPluiePro(risquePluie, [], {}).legende.at(-1)?.texte, 'Non atteint');
 const points = (d: string) => d.split(/Z/i).map((a) => (a.match(/-?\d+(?:\.\d+)?[ ,]-?\d+(?:\.\d+)?/g) ?? []).map((s) => s.split(/[ ,]/).map(Number))).filter((a) => a.length >= 3);
 const aire = (a: number[][]) => {
   let s = 0;

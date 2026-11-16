@@ -33,6 +33,7 @@ export function Header() {
 }
 
 export function Footer() {
+  const release = process.env.NEXT_PUBLIC_RELEASE;
   return (
     <footer className="mt-16 bg-anthracite text-sm text-gray-300">
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -44,6 +45,7 @@ export function Footer() {
           <Link href="/confidentialite/" className="underline">Confidentialité et cookies</Link>
           <Link href="/attestation-meteo/" className="underline">Attestation météo</Link>
           <span>© {new Date().getFullYear()} {SITE_NAME}</span>
+          <span title={release ? `Version publiée : ${release}` : undefined}>Version {release ? release.slice(0, 7) : 'locale'}</span>
         </p>
       </div>
     </footer>

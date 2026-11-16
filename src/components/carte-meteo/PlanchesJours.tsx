@@ -311,6 +311,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 2.6 : 1) * (tailleIcones / 100);
   // Moins il y a de points, plus les pictos grossissent (jusqu'à environ deux fois au niveau 4).
   const taillePicto = tailleBase * (parQuarts ? 1 : 1 / Math.sqrt(partDetail));
+  const tailleImagePicto = taillePicto * (zoneCarte === 'dep:66' && !weekEnd && (duree === 2 || duree === 4) ? 2 : 1);
   /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
   const nombreMax = Math.max(3, Math.floor((largeurCarte / (tailleBase * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
 
@@ -728,7 +729,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           draggable={false}
                           title="Cliquer pour changer le picto, glisser pour déplacer le picto et ses températures"
                           onPointerDown={(e) => debutPicto(e, cle)}
-                          style={{ width: taillePicto, height: taillePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
+                          style={{ width: tailleImagePicto, height: tailleImagePicto, marginTop: taillePicto - tailleImagePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
                         />
                         {pictoId && estPictoNeige(pictoId) && lpns[cle] && (
                           <span style={{ fontFamily: policeValeurs, fontWeight: 700, fontSize: Math.max(12, Math.round(taillePicto * 0.22)), color: '#0c4a6e', background: '#f0f9ff', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>LPN : {lpns[cle]} m</span>

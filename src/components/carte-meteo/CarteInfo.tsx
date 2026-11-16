@@ -24,6 +24,7 @@ import { grandeZone } from '@/lib/carte-meteo/grandes-zones';
 import TexteSurCarte from './TexteSurCarte';
 import { PictoZone, largeurPicto } from './PictosZones';
 import { ARRONDI_ZONES_DEFAUT, lisserContoursZones } from '@/lib/carte-meteo/lissage-zones';
+import { estPluiePro, habillerPluiePro, plagePluie, POLICE_PLUIE_PRO } from '@/lib/carte-meteo/pluie-pro';
 import {
   GRIS_HORS_ZONE,
   accepteZones,
@@ -135,6 +136,9 @@ interface Props {
   dateCarte?: string;
   /** Modèle et heure de son passage (UTC, « 12z »), pour l'option « heure du run ». */
   run?: { modele: string; z: string };
+  /** Modèle et fournisseur réellement utilisés, même sans heure de run disponible. */
+  modelePrevision?: string;
+  periodePrevision?: string;
   logoId: string;
   /** Début du nom du fichier exporté. */
   prefixeFichier: string;
@@ -218,7 +222,7 @@ function titreEnMinuscules(titre: string): string {
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, modelePrevision, periodePrevision, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -288,12 +292,14 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   }, [corrections, retires, titreSaisi, sousTitreSaisi, titreTopSaisi]);
   // Style « zones et fourchettes » : départements regroupés en zones de même classe de valeurs, une fourchette par zone.
   // Projections par région (valeurs des départements fournies) et zonage fin : restent en valeurs.
-  const enZones = affichage?.styleCarte === 'zones' && accepteZones(theme) && !valeursDepartements && !zonageFin;
+  const enZones = (affichage?.styleCarte === 'zones' || affichage?.styleCarte === 'pluie-pro') && accepteZones(theme) && !valeursDepartements && !zonageFin;
+  const pluiePro = enZones && affichage?.styleCarte === 'pluie-pro' && estPluiePro(theme);
+  const policeZones = pluiePro ? POLICE_PLUIE_PRO : POLICE_ZONES;
   // Minimales, maximales, matin : titre = jour prévu, sous-titre = nature des valeurs ; les autres : nom de la carte et date / période.
   const bulletinTemperature = enZones && estBulletinTemperature(theme.id);
   const zonesTemperature = enZones && enClassesTemperature(theme);
   const picto: PictoZones = zonesTemperature ? 'thermometre' : pictoZones(theme);
-  const titre = titreSaisi ?? (enZones ? (bulletinTemperature ? (dateCarte ? titreDateZones(dateCarte) : theme.court) : titreEnMinuscules(theme.titre)) : theme.titre);
+  const titre = titreSaisi ?? (pluiePro ? 'RISQUE DE FORTES PLUIES' : enZones ? (bulletinTemperature ? (dateCarte ? titreDateZones(dateCarte) : theme.court) : titreEnMinuscules(theme.titre)) : theme.titre);
   // Heure du run : « AROME (12z) » à la place du nom du modèle quand le sous-titre le contient, sinon ajouté à la fin.
   const sousTitreAvecRun = (() => {
     if (!affichage?.heureRun || !run) return sousTitre;
@@ -302,6 +308,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     return i >= 0 ? `${sousTitre.slice(0, i)}${nomRun}${sousTitre.slice(i + run.modele.length)}` : `${sousTitre} · ${nomRun}`;
   })();
   const sousTitreAffiche = sousTitreSaisi ?? (bulletinTemperature ? sousTitreZones(theme.id) : sousTitreAvecRun);
+  const periodePluie = sousTitreSaisi ?? periodePrevision ?? sousTitre;
   /** Date d'élaboration de la carte (Paris), en bas à droite. */
   const maintenant = affichage?.elaboreeLe ? new Date(affichage.elaboreeLe) : new Date();
   const dateElaboree =
@@ -363,9 +370,10 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     const boite = unirBoites(contoursDep.filter((c) => selection.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
     // Régions et départements : la colonne de gauche reste libre pour le classement et la légende.
     // Zones et fourchettes, France : la colonne de gauche reste libre pour le grand thermomètre, le haut pour le titre.
+    if (pluiePro) return ajusterVue(boite, { gauche: 190, haut: 150, droite: largeur - 18, bas: HAUTEUR_CARTE - 62 }, 0.01);
     if (enZones && enFrance) return ajusterVue(boite, ZONE_FRANCE_ZONES, 0.01);
     return enFrance ? ajusterVue(boite, ZONE_FRANCE, 0.01) : ajusterVue(boite, ZONE_UTILE, enDepartement ? 0.03 : 0.06);
-  }, [contoursDep, selection, enFrance, enDepartement, enZones]);
+  }, [contoursDep, selection, enFrance, enDepartement, enZones, pluiePro, largeur]);
 
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const logoUrl = logo?.fichier || null;
@@ -402,8 +410,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
    * écarts et les nuages, comme la teinte habituelle), regroupées en zones. Températures : classes de 5 °C ; autres cartes :
    * classes tirées des paliers du thème.
    */
-  const zonesTemp = useMemo(() => {
-    if (!enZones || contoursDep.length === 0) return [];
+  const valeursZones = useMemo(() => {
     const parDep = new Map<string, number[]>();
     for (const p of dansZone) {
       if (p.neige) continue;
@@ -414,14 +421,20 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     const enMoyenne = !zonesTemperature && (theme.signe || theme.id === 'nuages' || theme.id === 't');
     const valeurs: Record<string, number> = {};
     for (const [dep, v] of parDep) valeurs[dep] = enMoyenne ? moyenne(v) : theme.ordre === 'desc' ? Math.max(...v) : Math.min(...v);
-    return calculerZones(contoursDep, valeurs, theme.ordre, zonesTemperature ? undefined : reglesPaliers(theme, Object.values(valeurs)));
-  }, [enZones, contoursDep, dansZone, theme, zonesTemperature]);
+    return valeurs;
+  }, [dansZone, theme, zonesTemperature]);
+  const zonesOrigine = useMemo(() => {
+    if (!enZones || contoursDep.length === 0) return [];
+    return calculerZones(contoursDep, valeursZones, theme.ordre, zonesTemperature ? undefined : reglesPaliers(theme, Object.values(valeursZones)));
+  }, [enZones, contoursDep, valeursZones, theme, zonesTemperature]);
+  const habillagePluie = useMemo(() => pluiePro ? habillerPluiePro(theme, zonesOrigine, valeursZones) : null, [pluiePro, theme, zonesOrigine, valeursZones]);
+  const zonesTemp = habillagePluie?.zones ?? zonesOrigine;
 
   /**
    * Zones et fourchettes : contours des départements adoucis. Les limites de zones et les frontières entre départements perdent
    * leurs angles vifs ; la silhouette de la France (côtes, frontières) reste exacte (voir lissage-zones).
    */
-  const arrondiZones = affichage?.arrondiZones ?? ARRONDI_ZONES_DEFAUT;
+  const arrondiZones = pluiePro ? 0 : affichage?.arrondiZones ?? ARRONDI_ZONES_DEFAUT;
   const departementsRendus = useMemo(() => {
     if (!enZones || arrondiZones <= 0 || contoursDep.length === 0) return departements;
     const zoneDe = new Map<string, string>();
@@ -657,7 +670,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     x: 14,
     y: 10,
     w: Math.round(Math.max(titre.length * 0.575 * tailleTitreZones, sousTitreAffiche.length * 0.54 * tailleSousTitreZones) + 24),
-    h: Math.round(tailleTitreZones * 1.1 + tailleSousTitreZones * 1.1 + 18),
+    h: pluiePro ? 138 : Math.round(tailleTitreZones * 1.1 + tailleSousTitreZones * 1.1 + 18),
   };
   // Grand picto à gauche : le thermomètre (étroit et haut), les autres en carré.
   const rectThermometre: Rect =
@@ -672,40 +685,49 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
         .filter((z) => z.local)
         .map((z) => ({ cle: z.cle, ecart: Math.abs(z.local!.valeur - (theme.ordre === 'asc' ? z.min : z.max)) / Math.max(1, Math.abs(theme.ordre === 'asc' ? z.min : z.max)) }))
         .sort((a, b) => b.ecart - a.ecart)
-        .slice(0, zonesTemperature ? Infinity : 3)
+        .slice(0, zonesTemperature || pluiePro ? Infinity : 3)
         .map((x) => x.cle)
     );
     const elements = zonesTemp.flatMap((z) => {
       const grande = !z.petite;
-      const fs = grande ? 21 : 16;
-      const texte = zonesTemperature ? texteFourchette(z.min, z.max) : texteFourchetteTheme(theme, z.min, z.max);
+      const fs = pluiePro ? 23 : grande ? 21 : 16;
+      const texte = pluiePro ? plagePluie(z.min, z.max) : zonesTemperature ? texteFourchette(z.min, z.max) : texteFourchetteTheme(theme, z.min, z.max);
       const largeurPilule = texte.length * 0.6 * fs + 1.1 * fs;
-      const thermo = grande ? 1.9 * fs : 0;
+      const thermo = pluiePro ? 24 : grande ? 1.9 * fs : 0;
       const centre = versEcran(z.centre, vue);
-      const fourchette = { code: z.cle, texte, fs, thermo, couleur: z.couleurEtiquette, local: false, x: centre.x, y: centre.y, l: largeurPilule + (thermo ? largeurPicto(picto, thermo) + 4 : 0), h: Math.max(1.5 * fs, thermo), priorite: grande ? 0 : 1 };
+      const fourchette = { code: z.cle, texte, fs, thermo, couleur: z.couleurEtiquette, local: false, x: centre.x, y: centre.y, l: largeurPilule + (thermo ? largeurPicto(picto, thermo) + 4 : 0), h: pluiePro ? 42 : Math.max(1.5 * fs, thermo), priorite: grande ? 0 : 1 };
       if (!z.local || !locauxRetenus.has(z.cle)) return [fourchette];
       const c = versEcran(z.local.centre, vue);
-      const t = zonesTemperature ? texteLocal(z.local.valeur) : texteLocalTheme(theme, z.local.valeur);
-      return [fourchette, { code: `loc-${z.local.departement}`, texte: t, fs: 14, thermo: 0, couleur: z.couleurEtiquette, local: true, x: c.x, y: c.y, l: t.length * 0.58 * 14 + 14, h: 21, priorite: 1 }];
+      const t = pluiePro ? `loc. ${plagePluie(z.local.valeur, z.local.valeur)}` : zonesTemperature ? texteLocal(z.local.valeur) : texteLocalTheme(theme, z.local.valeur);
+      const fsLocal = pluiePro ? 23 : 14;
+      return [fourchette, { code: `loc-${z.local.departement}`, texte: t, fs: fsLocal, thermo: 0, couleur: z.couleurEtiquette, local: true, x: c.x, y: c.y, l: t.length * 0.6 * fsLocal + 25, h: pluiePro ? 42 : 21, priorite: 1 }];
     });
     const obstacles: Rect[] = [
       rectTitreZones,
-      rectThermometre,
+      ...(pluiePro ? [{ x: 14, y: 310, w: 185, h: 280 }, { x: 0, y: HAUTEUR_CARTE - 60, w: largeur, h: 60 }] : [rectThermometre]),
       { x: largeur / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 },
       ...(affichage?.dateElaboration ? [{ x: largeur - 330, y: HAUTEUR_CARTE - 34, w: 320, h: 34 }] : []),
       ...(logoUrl ? [{ x: largeur - 24 - 240, y: 21, w: 240, h: hauteurLogo }] : []),
       ...(texteIA.rect ? [texteIA.rect] : []),
     ];
+    // Un cartouche de pluie reste dans sa zone : aucune étiquette déplacée vers une zone voisine ou en mer.
+    const ctx = pluiePro && typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+    const chemins = new Map<string, Path2D[]>();
+    if (ctx) for (const z of zonesTemp) {
+      chemins.set(z.cle, contoursDep.filter((d) => z.departements.includes(d.code)).map((d) => new Path2D(d.d)));
+      if (z.local) chemins.set(`loc-${z.local.departement}`, contoursDep.filter((d) => d.code === z.local!.departement).map((d) => new Path2D(d.d)));
+    }
     const positions = placerSansChevauchement(
       elements.map((e) => ({ code: e.code, x: e.x, y: e.y, gauche: e.l / 2, droite: e.l / 2, haut: e.h / 2, bas: e.h / 2, priorite: e.priorite })),
       obstacles,
       { largeur, hauteur: HAUTEUR_CARTE },
-      70
+      70,
+      ctx ? (e, x, y) => (chemins.get(e.code) ?? []).some((ch) => ctx.isPointInPath(ch, (x - vue.tx) / vue.echelle, (y - vue.ty) / vue.echelle)) : undefined
     );
     // Une zone garde toujours son étiquette : sans place libre, elle reste au centre de la zone.
     return elements.map((e) => ({ ...e, ...(positions.get(e.code) ?? {}) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enZones, zonesTemp, vue, largeur, logoUrl, hauteurLogo, affichage?.dateElaboration, cleTexte, rectTitreZones.w, rectTitreZones.h, enFrance, theme, zonesTemperature, picto]);
+  }, [enZones, zonesTemp, vue, largeur, logoUrl, hauteurLogo, affichage?.dateElaboration, cleTexte, rectTitreZones.w, rectTitreZones.h, enFrance, theme, zonesTemperature, picto, pluiePro, contoursDep]);
 
   async function exporter() {
     if (!carteRef.current) return;
@@ -715,6 +737,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     if (enEdition) flushSync(() => setEdition(false));
     setEnExport(true);
     try {
+      if (pluiePro) await Promise.all([500, 600, 700, 800].map((poids) => document.fonts.load(`${poids} 24px "Montserrat Meteo"`)));
       await exporterEnJpg(carteRef.current, `${prefixeFichier}-${normaliser(theme.court).replace(/ /g, '-')}`, largeur, HAUTEUR_CARTE);
     } catch (e) {
       console.error('Export de la carte info', e);
@@ -808,7 +831,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
         theme={enZones ? null : affichage?.theme ?? null}
         vue={vue}
         departements={departementsRendus}
-        regions={regionsAffichees}
+        regions={pluiePro ? null : regionsAffichees}
         selection={selection}
         marqueurs={[]}
         echelleMarqueurs={1}
@@ -820,7 +843,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
         hauteurLogo={hauteurLogo || undefined}
         logoDroite={enZones ? largeur - 24 : null}
         sansTitre={enZones}
-        pied="www.alertes-meteo.com"
+        pied={pluiePro ? '' : 'www.alertes-meteo.com'}
         titreADroite={(enFrance && !titreAGauche) || titreDroite}
         titreEchelle={titreEchelle}
         titreGauche={titreAGauche ? MARGE_COLONNE : undefined}
@@ -832,7 +855,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
         remplissages={cellules ? undefined : remplissages}
         cellules={cellules}
       >
-        {affichage?.dateElaboration && (
+        {affichage?.dateElaboration && !pluiePro && (
           <div style={{ position: 'absolute', right: 14, bottom: 10, zIndex: 6, color: '#fff', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: 14, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,0.7)' }}>
             Carte élaborée le : {dateElaboree}
           </div>
@@ -927,25 +950,42 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
 
         {enZones && (
           <>
-            <div style={{ position: 'absolute', left: rectTitreZones.x + 10, top: rectTitreZones.y + 4, zIndex: 4, fontFamily: POLICE_ZONES, whiteSpace: 'nowrap', lineHeight: 1.1 }}>
-              <div style={{ fontSize: Math.round(tailleTitreZones), fontWeight: 900, color: '#0b2e6b' }}>{titre}</div>
-              <div style={{ marginTop: 3, fontSize: Math.round(tailleSousTitreZones), fontWeight: 700, color: '#1d5fae' }}>{sousTitreAffiche}</div>
+            <div style={{ position: 'absolute', left: rectTitreZones.x + 10, top: rectTitreZones.y + 4, zIndex: 4, fontFamily: policeZones, whiteSpace: 'nowrap', lineHeight: 1.1 }}>
+              <div style={{ fontSize: Math.round(pluiePro ? Math.min(34, tailleTitreZones) : tailleTitreZones), fontWeight: pluiePro ? 800 : 900, color: '#102F4C' }}>{titre}</div>
+              {pluiePro ? <>
+                <div style={{ marginTop: 8, fontSize: 20, fontWeight: 600, color: '#2468AD' }}>CUMULS PRÉVUS SUR LA PÉRIODE</div>
+                <div style={{ marginTop: 10, width: placeTitreZones, whiteSpace: 'normal', fontSize: 18, fontWeight: 700, color: '#102F4C', lineHeight: 1.3 }}>{periodePluie}</div>
+                <div style={{ marginTop: 6, maxWidth: placeTitreZones, whiteSpace: 'normal', fontSize: 15, fontWeight: 600, color: '#456078' }}>{modelePrevision ?? run?.modele ?? 'Modèle non renseigné'}{affichage?.heureRun && run ? ` · Run ${run.z}` : ''}</div>
+              </> : <div style={{ marginTop: 3, fontSize: Math.round(tailleSousTitreZones), fontWeight: 700, color: '#1d5fae' }}>{sousTitreAffiche}</div>}
             </div>
-            <div style={{ position: 'absolute', left: rectThermometre.x, top: rectThermometre.y, zIndex: 4, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.25))' }}>
+            {!pluiePro && <div style={{ position: 'absolute', left: rectThermometre.x, top: rectThermometre.y, zIndex: 4, filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.25))' }}>
               <PictoZone type={picto} hauteur={rectThermometre.h} couleur={zonesTemperature && theme.ordre === 'desc' ? '#c4441c' : '#1d5fae'} graduations />
-            </div>
+            </div>}
+            {pluiePro && habillagePluie && <>
+              <div style={{ position: 'absolute', left: 20, top: 325, width: 176, padding: '14px 12px', borderRadius: 10, background: '#ffffffed', color: '#102F4C', fontFamily: policeZones, fontWeight: 500, zIndex: 4 }}>
+                <div style={{ fontSize: 16, marginBottom: 12 }}>CUMULS EN MM</div>
+                {habillagePluie.legende.map((p) => <div key={p.couleur} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 15, whiteSpace: 'nowrap' }}><span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 4, background: p.couleur, border: '1px solid #102f4c20' }} />{p.texte}</div>)}
+                <div style={{ marginTop: 14, fontSize: 12, lineHeight: 1.45 }}>Couleur selon le maximum de la zone.<br />Seuils de la carte sélectionnée.</div>
+              </div>
+              <div style={{ position: 'absolute', left: 20, right: 20, bottom: 12, zIndex: 4, borderTop: '1px solid #102f4c25', paddingTop: 9, display: 'flex', justifyContent: 'space-between', gap: 16, color: '#102F4C', fontFamily: policeZones, fontSize: 13, fontWeight: 500 }}>
+                <span>www.alertes-meteo.com</span>
+                {affichage?.dateElaboration && <span>Carte élaborée le : {dateElaboree}</span>}
+              </div>
+            </>}
             {zonesTemp.length === 0 && (
               // Aucune zone (pas de neige, pas de risque…) : on l'écrit, plutôt que de laisser une carte grise muette.
               <div style={{ position: 'absolute', left: largeur / 2 + (enFrance ? 60 : 0), top: HAUTEUR_CARTE / 2, transform: 'translate(-50%, -50%)', zIndex: 4, fontFamily: POLICE_ZONES, fontSize: 22, fontWeight: 800, lineHeight: 1, padding: '0.3em 0.7em', borderRadius: 999, background: '#1d5fae', color: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', whiteSpace: 'nowrap' }}>
-                {theme.paliers.find((x) => x.neutre)?.libelle ?? 'Aucune valeur notable'}
+                {pluiePro ? 'Aucune zone de pluie notable' : theme.paliers.find((x) => x.neutre)?.libelle ?? 'Aucune valeur notable'}
               </div>
             )}
             {etiquettesZones.map((e) => (
-              <div key={e.code} style={{ position: 'absolute', left: e.x, top: e.y, transform: 'translate(-50%, -50%)', zIndex: 4, display: 'flex', alignItems: 'center', gap: 4, fontFamily: POLICE_ZONES, whiteSpace: 'nowrap' }}>
+              <div key={e.code} style={{ position: 'absolute', left: e.x, top: e.y, transform: 'translate(-50%, -50%)', zIndex: 4, display: 'flex', alignItems: 'center', gap: 4, fontFamily: policeZones, whiteSpace: 'nowrap' }}>
                 {e.thermo > 0 && <PictoZone type={picto} hauteur={e.thermo} couleur={e.couleur} />}
                 <span
                   style={
-                    e.local
+                    pluiePro
+                      ? { height: 42, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: e.fs, fontWeight: 800, lineHeight: 1, padding: '0 12px', borderRadius: 7, background: '#2468AD', color: '#ffffff', boxShadow: '0 2px 5px rgba(16,47,76,0.15)' }
+                      : e.local
                       ? { fontSize: e.fs, fontWeight: 700, lineHeight: 1, padding: '0.18em 0.45em', borderRadius: 999, background: '#ffffff', color: e.couleur, border: `1.5px solid ${e.couleur}`, boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }
                       : { fontSize: e.fs, fontWeight: 800, lineHeight: 1, padding: '0.22em 0.55em', borderRadius: 999, background: e.couleur, color: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)' }
                   }
@@ -990,7 +1030,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
           </div>
         )}
 
-        {mention && <div className="cinfo-mention">{mention}</div>}
+        {mention && <div className="cinfo-mention" style={pluiePro ? { bottom: 42, color: '#456078', textShadow: 'none', fontFamily: policeZones, fontSize: 12, fontWeight: 500 } : undefined}>{mention}</div>}
         {bandeau && (
           <div className="cinfo-bandeau" style={{ left: MARGE_COLONNE, top: logoUrl ? 21 + hauteurLogo + 8 : rectTitre.y + rectTitre.h + 6 }}>
             {bandeau}

@@ -22,3 +22,10 @@ for (const [id, label, nombre, decor] of variantes) {
   writeFileSync(`public/pictos-alertes/${id}.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="${label}">${ciel}${montagne}${nuage}${neige}${pluie}${limite}</svg>\n`);
 }
 console.log(`${variantes.length} pictos neige en montagne avec LPN générés.`);
+
+// Altitudes proposées à la sélection manuelle : un flocon, puis le nombre, sans nuage ni montagne.
+for (const altitude of [800, 1000, 1200, 1500, 1700, 2000]) {
+  const branches = Array.from({ length: 6 }, (_, i) => `<path transform="rotate(${i * 60} 32 22)" d="M32 22V5M32 13L26 8M32 13L38 8" fill="none" stroke="#0284c7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+  const texte = `<text x="32" y="61" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="800" fill="#102f4c" stroke="#ffffff" stroke-width="1.3" paint-order="stroke">${altitude}</text>`;
+  writeFileSync(`public/pictos-alertes/neige-flocon-${altitude}.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Neige en montagne : ${altitude} m">${branches}${texte}</svg>\n`);
+}

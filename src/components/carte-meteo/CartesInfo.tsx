@@ -78,6 +78,16 @@ const DANGERS: { id: string; libelle: string; picto: string }[] = [
 ];
 /** Danger d'une carte de risque : « risque-pluie-24h » → « risque-pluie », « orages » → « risque-orage ». */
 const dangerDe = (id: string) => (id === 'orages' ? 'risque-orage' : id.replace(/-(periode|24h)$/, ''));
+const BILANS_PAR_DANGER: Record<string, string[]> = {
+  'risque-orage': [],
+  'risque-pluie': ['rr6', 'rr0', 'rr24c', 'rr24', 'rr72'],
+  'risque-vent': ['raf24'],
+  'risque-neige': ['snow', 'snow-montagne'],
+  'risque-verglas': [],
+  'risque-tempete': ['raf24'],
+  'risque-froid': ['tn-prov', 'tn-fin'],
+  'risque-chaleur': ['tx-chaleur', 'tx-prov', 'tx-fin'],
+};
 
 const MODES: [Mode, string][] = [
   ['prevision', 'Prévisions'],
@@ -167,7 +177,9 @@ const finDuRun = (points: PointCarte[], libelleModele: string) => {
   const fin = new Date(Math.max(...pts.map((p) => Date.parse(p.finRun as string))));
   const jour = fin.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
   const heure = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hour12: false, timeZone: 'Europe/Paris' }).format(fin).replace(/\D/g, ''); // chiffres seuls : le format français ajoute déjà « h »
-  return { fin: `${jour} à ${heure} h`.toUpperCase(), modele: libelleModele };
+  const debut = new Date(Math.min(...pts.map((p) => Date.parse(p.debutRun as string))));
+  const dateHeure = (d: Date) => d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  return { fin: `${jour} à ${heure} h`.toUpperCase(), modele: libelleModele, periode: `DU ${dateHeure(debut)} AU ${dateHeure(fin)} (Paris)` };
 };
 
 /** « SAMEDI 11 OCTOBRE » */
@@ -252,6 +264,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     if (restreint && !(niveau === 'departement' && restreint.includes(departement))) setModele('arome');
   }, [modele, niveau, departement]);
   const [jour, setJour] = useState(0);
+  const [alerteParJour, setAlerteParJour] = useState(false);
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
   const [tailleValeurs, setTailleValeurs] = useState(uneCarte ? 160 : 130);
@@ -264,6 +277,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   /** Cartes de risque : relief (altitude minimale des communes, en m) ; 0 = plaine, comme les autres cartes. */
   const [reliefAlt, setReliefAlt] = useState<0 | 300 | 500 | 1000 | 2000>(0);
   const [dureeRisque, setDureeRisque] = useState<'jour' | 'periode' | '24h'>('periode');
+  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', heureRun: true, dateElaboration: true, seuilPluie: uneCarte ? 10 : 0, seuils: uneCarte ? { mm: 10, 'km/h': 60 } : undefined, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
   const themesPrevision = useMemo<ThemePrevision[]>(
     () =>
       (uneCarte
@@ -271,12 +285,12 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
         : // Cartes infos : « jusqu'à la fin du run » toujours pour AROME et Harmonie, chacun jusqu'au bout de son échéance (plus la carte du modèle choisi s'il est autre).
           THEMES_PREVISION.flatMap((t) => (t.run ? [...variantesRun(t), ...(modele === 'arome' || modele === 'harmonie' || modele === 'moyenne' ? [] : [t])] : [t]))
       ).map((t) => {
-        let r: ThemePrevision = chiffres && t.brut ? { ...t, ...t.brut, texteValeur: undefined, neutresVisibles: true } : t;
+        let r: ThemePrevision = (chiffres || (affichage.styleCarte === 'pluie-pro' && t.id.startsWith('risque-pluie'))) && t.brut ? { ...t, ...t.brut, texteValeur: undefined, neutresVisibles: true } : t;
         // Relief : les cartes de risque lisent les communes d'altitude (requête « montagne » avec l'altitude minimale choisie).
         if (reliefAlt > 0 && t.groupe === 'Risques') r = { ...r, montagne: true };
         return r;
       }),
-    [chiffres, reliefAlt, uneCarte, modele]
+    [chiffres, reliefAlt, uneCarte, modele, affichage.styleCarte]
   );
   const [zonageFin, setZonageFin] = useState(false);
   const echelleValeurs = tailleValeurs / 100;
@@ -306,8 +320,11 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   }, [alertesDemandees]);
   const [recherche, setRecherche] = useState('');
   // Affichage des cartes : thème, fond, relief, fleuves, contours (voir AffichageCarte).
-  const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', heureRun: true, dateElaboration: true, seuilPluie: uneCarte ? 10 : 0, seuils: uneCarte ? { mm: 10, 'km/h': 60 } : undefined, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
   const regler = (changement: Partial<AffichageCarte>) => setAffichage((a) => ({ ...a, ...changement }));
+  const choisirStyleCarte = (valeur: string) => {
+    regler({ styleCarte: valeur === 'pluie-pro' ? 'pluie-pro' : valeur === 'zones' ? 'zones' : 'valeurs' });
+    if (valeur === 'pluie-pro') setZonageFin(false);
+  };
   const [filtreGroupe, setFiltreGroupe] = useState('');
   const [climatDeps, setClimatDeps] = useState<ClimatDepartements | null>(null);
   const [climatCommunes, setClimatCommunes] = useState<{ dep: string; communes: ClimatCommune[] } | null>(null);
@@ -654,7 +671,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const modeleAffiche = previsions?.cle === cle ? infosModele(previsions.modele, previsions.modeles) : undefined;
   const themes: ThemeInfo[] = mode === 'prevision' ? themesPrevision : mode === 'bilan' ? THEMES_BILAN : THEMES_CLIMAT;
   // « Températures en direct » et « Observations en direct » ont leur propre page (/outils/temperatures-en-direct/, /outils/observations-en-direct/) : pas ici.
-  const groupes = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT && g.groupe !== GROUPE_JOURNEE && g.groupe !== GROUPE_OBS && g.groupe !== GROUPE_PLUIE_DIRECT);
+  const groupesBase = parGroupe(themes).filter((g) => g.groupe !== GROUPE_DIRECT && g.groupe !== GROUPE_JOURNEE && g.groupe !== GROUPE_OBS && g.groupe !== GROUPE_PLUIE_DIRECT);
+  const groupes = mode === 'bilan' && !uneCarte ? [...groupesBase, ...DANGERS.map((d) => ({ groupe: `danger:${d.id}`, themes: THEMES_BILAN.filter((t) => BILANS_PAR_DANGER[d.id].includes(t.id)) }))] : groupesBase;
   const tousThemes = groupes.flatMap((g) => g.themes);
   const carteEffective = uneCarte ? tousThemes.find((t) => t.id === carteChoisie) ?? tousThemes[0] : undefined;
   // Carte « jusqu'à la fin du run » d'un seul modèle : le modèle correspondant est sélectionné d'office.
@@ -669,7 +687,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     : groupes
         .filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi)
         // Risques : un danger à la fois, avec ses cartes du jour, de la période et des 24 h glissantes.
-        .map((g) => (g.groupe === GROUPE_RISQUES && groupeChoisi === GROUPE_RISQUES ? { ...g, themes: g.themes.filter((t) => dangerDe(t.id) === dangerChoisi) } : g));
+        .map((g) => (g.groupe === GROUPE_RISQUES && groupeChoisi === GROUPE_RISQUES ? { ...g, themes: g.themes.filter((t) => dangerDe(t.id) === dangerChoisi && (!alerteParJour || (!(t as ThemePrevision).periode && !(t as ThemePrevision).fenetreHeures))) } : g));
   // AROME et Harmonie : leurs cartes « jusqu'à la fin du run » s'affichent toujours, même quand le modèle choisi est un autre.
   const modelesRunAffiches = [...new Set(groupesAffiches.flatMap((g) => g.themes).map((t) => modeleAutre(t)).filter((m): m is NonNullable<typeof m> => m != null))].sort().join(',');
   useEffect(() => {
@@ -713,6 +731,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const resultatsRecherche = uneCarte ? tousThemes.filter((t) => !(t.groupe === GROUPE_RISQUES && /-(periode|24h)$/.test(t.id)) && (!filtreGroupe || t.groupe === filtreGroupe) && normaliser(`${t.titre} ${t.court} ${t.groupe}`).includes(normaliser(recherche))) : [];
   /** Nom affiché d'un groupe : le bilan du mois porte le nom du mois choisi (« Octobre 2026 »). */
   const nomGroupe = (groupe: string) => {
+    const danger = DANGERS.find((d) => groupe === `danger:${d.id}`);
+    if (danger) return `${danger.picto} ${danger.libelle}`;
     const nom = groupe === GROUPE_MOIS && bilans?.mois ? libelleMoisCourt(bilans.mois.affiche) : groupe;
     return ICONES_GROUPE[groupe] ? `${ICONES_GROUPE[groupe]} ${nom}` : nom;
   };
@@ -1237,11 +1257,17 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           {!uneCarte && (
           <label className="text-sm font-medium">
             <span className={legende}>Thème</span>
-            <select value={groupeChoisi} onChange={(e) => setGroupeChoisi(e.target.value)} className={selectBarre}>
+            <select value={mode === 'prevision' && groupeChoisi === GROUPE_RISQUES ? `danger:${dangerChoisi}` : groupeChoisi} onChange={(e) => {
+              if (mode === 'prevision' && e.target.value.startsWith('danger:')) {
+                setDangerChoisi(e.target.value.slice(7));
+                setGroupeChoisi(GROUPE_RISQUES);
+              } else setGroupeChoisi(e.target.value);
+            }} className={selectBarre}>
               {mode !== 'climat' && <option value={ESSENTIEL}>{ESSENTIEL} (maxi, mini, rafales, pluie)</option>}
+              {mode === 'prevision' && <optgroup label="Phénomènes météo">{DANGERS.map((d) => <option key={d.id} value={`danger:${d.id}`}>{d.picto} {d.libelle}</option>)}</optgroup>}
               {groupes.map((g) => (
                 <option key={g.groupe} value={g.groupe}>
-                  {nomGroupe(g.groupe)} ({g.themes.length})
+                  {nomGroupe(g.groupe)}{g.themes.length ? ` (${g.themes.length})` : ''}
                 </option>
               ))}
             </select>
@@ -1250,6 +1276,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           {!uneCarte && mode === 'prevision' && groupeChoisi === GROUPE_RISQUES && (
             <fieldset>
               <legend className={`${legende} !text-red-600`}>Risque</legend>
+              <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Échéance des alertes">
+                {[0, 1, 2, 3, 4, 5].map((j) => <button key={j} type="button" aria-pressed={alerteParJour && jour === j} onClick={() => { changerJour(j); setAlerteParJour(true); }} className={`rounded-lg border px-3 py-1 text-sm font-bold ${alerteParJour && jour === j ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>J{j}</button>)}
+                <button type="button" aria-pressed={!alerteParJour} onClick={() => setAlerteParJour(false)} className={`rounded-lg border px-3 py-1 text-sm font-bold ${!alerteParJour ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>Toutes les périodes</button>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {DANGERS.map((d) => (
                   <button
@@ -1325,9 +1355,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
             <>
               <label className="text-sm font-medium" title="Zones et fourchettes : départements regroupés en zones de même niveau, une fourchette de valeurs par zone">
                 <span className={legende}>🗺️ Style de carte</span>
-                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => regler({ styleCarte: e.target.value === 'zones' ? 'zones' : 'valeurs' })} className={`${selectBarre} !border-orange-500 !bg-orange-500/15 font-semibold ring-2 ring-orange-500`}>
+                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => choisirStyleCarte(e.target.value)} className={`${selectBarre} !border-orange-500 !bg-orange-500/15 font-semibold ring-2 ring-orange-500`}>
                   <option value="valeurs">Valeurs (habituel)</option>
                   <option value="zones">Zones et fourchettes</option>
+                  {mode === 'prevision' && <option value="pluie-pro">Zones et fourchettes : pluie Pro (4 couleurs)</option>}
                 </select>
               </label>
               {affichage.styleCarte === 'zones' && (
@@ -1533,6 +1564,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           {groupesAffiches.map((g) => (
             <section key={g.groupe} className={uneCarte ? 'mt-4' : 'mt-8'}>
               {!uneCarte && <h2 className="border-b border-border pb-1 text-xl font-extrabold">{nomGroupe(g.groupe)}</h2>}
+              {mode === 'bilan' && g.groupe.startsWith('danger:') && g.themes.length === 0 && <p className="mt-4 rounded-xl border border-border bg-surface p-5 text-muted">Les observations {g.groupe === 'danger:risque-orage' ? 'd’orages' : 'de verglas'} ne sont pas disponibles dans les données des stations utilisées pour ces bilans.</p>}
+              {mode === 'bilan' && g.groupe === 'danger:risque-tempete' && <p className="mt-2 text-sm text-muted">Rafales mesurées aux stations pour le suivi des épisodes de vent fort.</p>}
               <div className={`mt-4 grid grid-cols-1 gap-8 ${uneCarte ? 'mx-auto max-w-[1100px]' : 'xl:grid-cols-2'}`}>
                 {g.themes.map((theme) => (
                   <div key={`${theme.id}-${zone}`} id={`carte-${theme.id}`} className="min-w-0 scroll-mt-4">
@@ -1558,6 +1591,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                           theme={theme}
                           zone={zone}
                           points={pointsPrevision[theme.id]}
+                          modelePrevision={`${modeleCumulAffiche.libelle} (${modeleCumulAffiche.fournisseur})`}
                           sousTitre={`${periodeCumul((theme as ThemePrevision).cumulJours!)} · ${modeleCumulAffiche.libelle}`}
                           logoId={logoId}
                           prefixeFichier={`carte-prevision-${aujourdhui}-${normaliser(nomZone).replace(/ /g, '-')}`}
@@ -1616,6 +1650,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         zone={zone}
                         points={pointsPrevision[theme.id] ?? []}
                         run={(theme as ThemePrevision).cumulJours ? undefined : infoRun(theme as ThemePrevision).runCarte}
+                        modelePrevision={infoRun(theme as ThemePrevision).contexte}
+                        periodePrevision={(theme as ThemePrevision).run ? infoRun(theme as ThemePrevision).sousTitreRun?.periode : undefined}
                         dateCarte={dateISO}
                         sousTitre={
                           ((theme as ThemePrevision).fenetreHeures
@@ -1670,9 +1706,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
             <div className="mt-3 grid grid-cols-1 items-end gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="text-sm font-medium" title="Zones et fourchettes : départements regroupés en zones de même niveau, une fourchette de valeurs par zone">
                 <span className={legende}>🗺️ Style de carte</span>
-                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => regler({ styleCarte: e.target.value === 'zones' ? 'zones' : 'valeurs' })} className={`${selectBarre} w-full !border-orange-500 !bg-orange-500/15 font-semibold ring-2 ring-orange-500`}>
+                <select value={affichage.styleCarte ?? 'valeurs'} onChange={(e) => choisirStyleCarte(e.target.value)} className={`${selectBarre} w-full !border-orange-500 !bg-orange-500/15 font-semibold ring-2 ring-orange-500`}>
                   <option value="valeurs">Valeurs (habituel)</option>
                   <option value="zones">Zones et fourchettes</option>
+                  {mode === 'prevision' && <option value="pluie-pro">Zones et fourchettes : pluie Pro (4 couleurs)</option>}
                 </select>
               </label>
               {affichage.styleCarte === 'zones' && (

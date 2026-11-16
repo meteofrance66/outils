@@ -20,7 +20,7 @@ import type { Point2D } from './projection-france';
 import { PALIERS_TEMPERATURE, palierDe, type Palier, type ThemeInfo } from './cartes-info';
 
 /** Style des cartes de valeurs : pastilles par point (habituel) ou zones et fourchettes. */
-export type StyleCarte = 'valeurs' | 'zones';
+export type StyleCarte = 'valeurs' | 'zones' | 'pluie-pro';
 
 /** Températures en bulletin (titre = jour, sous-titre = nature des valeurs) : comportement d'origine du style. */
 const THEMES_ZONES: Record<string, string> = {
