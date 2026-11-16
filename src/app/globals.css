@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Polices locales de la variante typographique, également intégrées aux exports JPG. */
+@font-face {
+  font-family: 'Barlow Condensed Meteo';
+  src: url('/fonts/meteo/BarlowCondensed-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Barlow Condensed Meteo';
+  src: url('/fonts/meteo/BarlowCondensed-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Barlow Condensed Meteo';
+  src: url('/fonts/meteo/BarlowCondensed-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat Meteo';
+  src: url('/fonts/meteo/Montserrat-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #f4f7fb;
   --surface: #ffffff;

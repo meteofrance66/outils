@@ -233,7 +233,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   /** Fond de carte : automatique (relief ou photos pour un département ou une région, uni pour la France), uni, relief NASA ou photos IGN. */
   const [fondChoisi, setFondChoisi] = useState<'auto' | 'uni' | Couche>(fondCarteMeteo ? 'relief' : 'auto');
   const [styleFond, setStyleFond] = useState<StyleFond | null>(styleInitial ?? (fondCarteMeteo ? null : 'rouge-or'));
-  const styleSauge = styleFond === 'mediterranee-sauge';
+  const typoModerne = styleFond === 'mediterranee-sauge-typo';
+  const styleSauge = styleFond === 'mediterranee-sauge' || typoModerne;
+  const policeTitres = typoModerne ? "'Barlow Condensed Meteo', sans-serif" : POLICE;
+  const policeValeurs = typoModerne ? "'Montserrat Meteo', sans-serif" : POLICE;
   const terresEurope = useTerres(styleFond != null);
   const fin = zonageFin && zone === 'france' && !parQuarts;
   type PointZone = { dep: string; lat: number; lon: number; maxi: number | null };
@@ -407,6 +410,14 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
     if (!planchRef.current) return;
     setEnExport(true);
     try {
+      if (typoModerne) {
+        // Attendre les vraies graisses avant de figer l'image, même après un changement de style.
+        const polices = await Promise.all([
+          ...[600, 700, 800].map((graisse) => document.fonts.load(`${graisse} 24px "Barlow Condensed Meteo"`)),
+          ...[600, 800].map((graisse) => document.fonts.load(`${graisse} 24px "Montserrat Meteo"`)),
+        ]);
+        if (polices.some((liste) => liste.length === 0)) throw new Error('Polices de la carte indisponibles');
+      }
       await exporterEnJpg(planchRef.current, `${weekEnd ? 'week-end' : `tendance-${duree}-jours${depart ? `-des-j${depart}` : ''}`}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modele.id}`, LARGEUR, hauteur);
     } catch (e) {
       console.error('Export de la planche en JPG', e);
@@ -595,7 +606,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
               transformOrigin: 'top left',
               background: styleSauge ? '#102F4C' : 'linear-gradient(160deg, #0b2a4a 0%, #123c6b 100%)',
               color: '#fff',
-              fontFamily: 'Arial, Helvetica, sans-serif',
+              fontFamily: typoModerne ? policeValeurs : 'Arial, Helvetica, sans-serif',
+              fontWeight: typoModerne ? 600 : 400,
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -606,8 +618,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                 <img src={logo.fichier} alt="" style={{ height: zoneCarte === 'dep:66' ? 84 * 1.15 : 84, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
               ) : null}
               <div style={{ background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
-                {avecTitre && <div style={{ fontFamily: POLICE, fontSize: 42, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{titre}</div>}
-                <div style={{ fontFamily: POLICE, fontSize: avecTitre ? 22 : 34, color: styleSauge ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousTitre}</div>
+                {avecTitre && <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 800 : undefined, letterSpacing: typoModerne ? -0.5 : undefined, fontSize: 42, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{titre}</div>}
+                <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 600 : undefined, fontSize: avecTitre ? 22 : 34, color: styleSauge ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousTitre}</div>
               </div>
             </div>
 
@@ -690,14 +702,14 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                       </g>
                     </svg>
                     {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={null} bandes={false} />}
-                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', color: styleSauge ? '#FFF0D2' : '#0b2a4a', fontFamily: POLICE, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', color: styleSauge ? '#FFF0D2' : '#0b2a4a', fontFamily: policeTitres, fontWeight: typoModerne ? 700 : undefined, fontSize: typoModerne ? 24 : 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
                       {jourLibelle(date)}
                     </div>
                     {styleSauge && zoneCarte === 'dep:66' && (
                       <svg width={largeurCarte} height={hauteurCarte} aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                        <g fontFamily="Arial, Helvetica, sans-serif" fontSize={Math.max(10, Math.min(16, largeurCarte * 0.027))} fontWeight={600} letterSpacing={1.5} textAnchor="middle">
+                        <g fontFamily={typoModerne ? policeValeurs : "Arial, Helvetica, sans-serif"} fontSize={Math.max(10, Math.min(16, largeurCarte * 0.027))} fontWeight={600} letterSpacing={1.5} textAnchor="middle">
                           <text x={largeurCarte * 0.48} y={hauteurCarte - 16} fill="#52634F" opacity={0.85}>ESPAGNE</text>
-                          <text x={largeurCarte - 20} y={hauteurCarte * 0.4} transform={`rotate(-90 ${largeurCarte - 20} ${hauteurCarte * 0.4})`} fill="#EAF3F8" opacity={0.85}>MER MÉDITERRANÉE</text>
+                          <text x={largeurCarte - 20} y={hauteurCarte * 0.4} transform={`rotate(-90 ${largeurCarte - 20} ${hauteurCarte * 0.4})`} fill="#EAF3F8" opacity={0.85} letterSpacing={typoModerne ? 0.5 : 1.5}>MER MÉDITERRANÉE</text>
                         </g>
                       </svg>
                     )}
@@ -717,16 +729,16 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           onPointerDown={(e) => debutPicto(e, cle)}
                           style={{ width: taillePicto, height: taillePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
                         />
-                        <span style={{ fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: policeValeurs, fontWeight: typoModerne ? 800 : undefined, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
-                          {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: '0.72em' }}>{p.maxi != null ? ' / ' : ''}{Math.round(p.mini)}°</span> : null}
+                          {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: typoModerne ? '0.8em' : '0.72em' }}>{p.maxi != null ? ' / ' : ''}{Math.round(p.mini)}°</span> : null}
                         </span>
                         {p.rafale != null && p.rafale >= seuilRafale && (() => {
                           const kmh = Math.round(p.rafale / 5) * 5;
                           const c = couleurRafale(kmh);
                           const angle = angleFleche(p.direction);
                           return (
-                            <span style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4, background: c.fond, color: c.texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 8px', fontFamily: POLICE, fontSize: Math.round(taillePicto * 0.42 * (tailleRafale / 100)), whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                            <span style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4, background: c.fond, color: c.texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 8px', fontFamily: policeTitres, fontSize: Math.round(taillePicto * 0.42 * (tailleRafale / 100)), whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
                               {angle != null && (
                                 <svg viewBox="-12 -12 24 24" width={Math.round(taillePicto * 0.42 * (tailleRafale / 100))} height={Math.round(taillePicto * 0.42 * (tailleRafale / 100))} aria-hidden>
                                   <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={c.texte} transform={`rotate(${angle})`} />
@@ -740,7 +752,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                         {risques && (() => {
                           const t = Math.round(taillePicto * 0.36);
                           const pastille = (fond: string, texte: string, icone: React.ReactNode, libelle: string) => (
-                            <span key={libelle} style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3, background: fond, color: texte, border: '2px solid #fff', borderRadius: 999, padding: '0 7px', fontFamily: POLICE, fontSize: t, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                            <span key={libelle} style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3, background: fond, color: texte, border: '2px solid #fff', borderRadius: 999, padding: '0 7px', fontFamily: policeTitres, fontSize: t, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
                               <svg viewBox="-12 -12 24 24" width={t} height={t} aria-hidden>{icone}</svg>
                               {libelle}
                             </span>

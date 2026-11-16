@@ -2,7 +2,7 @@
  * Styles de fond de la carte (option « Style de fond ») : fond uni ou dégradé, territoire coloré, mer toujours dessinée.
  * Les couleurs sont des attributs SVG (pas de CSS) pour passer dans l'export JPG.
  */
-export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'rouge-or-catalan' | 'rouge-or-mediterranee' | 'rouge-or-pastel' | 'mediterranee-sauge' | 'rouge-or-doux' | 'rouge-or-or' | 'rouge-or-rouge' | 'rouge-or-inverse' | 'rouge-or-territoire-rouge' | 'rouge-or-senyera' | 'parchemin' | 'marine-creme' | 'marine-bleu' | 'epure';
+export type StyleFond = 'bordeaux' | 'azur' | 'sauge' | 'ardoise' | 'sable' | 'lavande' | 'blanc' | 'gris' | 'bleu' | 'clair' | 'bleu-nuit' | 'creme' | 'rouge-or' | 'rouge-or-catalan' | 'rouge-or-mediterranee' | 'rouge-or-pastel' | 'mediterranee-sauge' | 'mediterranee-sauge-typo' | 'rouge-or-doux' | 'rouge-or-or' | 'rouge-or-rouge' | 'rouge-or-inverse' | 'rouge-or-territoire-rouge' | 'rouge-or-senyera' | 'parchemin' | 'marine-creme' | 'marine-bleu' | 'epure';
 
 /** Une couleur, ou un dégradé en diagonale (haut gauche vers bas droit). */
 export type Peinture = string | [string, string];
@@ -33,6 +33,13 @@ export interface DefStyleFond {
 export const STYLES_FOND: Record<StyleFond, DefStyleFond> = {
   'mediterranee-sauge': {
     libelle: 'Méditerranée sauge : crème, beige et bleu marine',
+    terre: '#C5CCB7', franceVoisine: '#E5E0D5', mer: '#4384AD',
+    territoire: '#FFF0D2', contour: '#69755E', voisins: '#9DA394',
+    cote: '#E5E0D5', senyera: false, texteMer: '#EAF3F8', epaisseurContour: 1.5,
+  },
+
+  'mediterranee-sauge-typo': {
+    libelle: 'Méditerranée sauge : Barlow + Montserrat',
     terre: '#C5CCB7', franceVoisine: '#E5E0D5', mer: '#4384AD',
     territoire: '#FFF0D2', contour: '#69755E', voisins: '#9DA394',
     cote: '#E5E0D5', senyera: false, texteMer: '#EAF3F8', epaisseurContour: 1.5,
