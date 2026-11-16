@@ -80,14 +80,23 @@ const DANGERS: { id: string; libelle: string; picto: string }[] = [
 const dangerDe = (id: string) => (id === 'orages' ? 'risque-orage' : id.replace(/-(periode|24h)$/, ''));
 const BILANS_PAR_DANGER: Record<string, string[]> = {
   'risque-orage': [],
-  'risque-pluie': ['rr6', 'rr0', 'rr24c', 'rr24', 'rr72'],
-  'risque-vent': ['raf24'],
+  'risque-pluie': ['rr6', 'rr0', 'rr24c', 'rr24', 'obs-rr36', 'obs-rr48', 'rr72'],
+  'risque-vent': ['raf24', 'obs-raf36', 'obs-raf48', 'obs-raf72'],
   'risque-neige': ['snow', 'snow-montagne'],
   'risque-verglas': [],
-  'risque-tempete': ['raf24'],
-  'risque-froid': ['tn-prov', 'tn-fin'],
-  'risque-chaleur': ['tx-chaleur', 'tx-prov', 'tx-fin'],
+  'risque-tempete': ['raf24', 'obs-raf36', 'obs-raf48', 'obs-raf72'],
+  'risque-froid': ['tn-prov', 'tn-fin', 'obs-tn24'],
+  'risque-chaleur': ['tx-chaleur', 'tx-prov', 'tx-fin', 'obs-tx24'],
 };
+/** Fenêtres réellement calculées par l’API des observations ; aucune prévision dans les bilans. */
+const PERIODES_BILAN = [
+  { id: 'jour', libelle: 'J0', aide: 'Journée ou nuit en cours : valeurs provisoires', cartes: ['tx-prov', 'tn-prov', 'rr0', 'rr6'] },
+  { id: 'veille', libelle: 'J−1', aide: 'Dernière journée climatologique ou nuit terminée : dates indiquées sur chaque carte', cartes: ['tx-fin', 'tn-fin', 'tx-chaleur', 'rr24c'] },
+  { id: '24h', libelle: '24 h', aide: 'Les 24 dernières heures', cartes: ['rr24', 'raf24', 'obs-tn24', 'obs-tx24'] },
+  { id: '36h', libelle: '36 h', aide: 'Les 36 dernières heures', cartes: ['obs-rr36', 'obs-raf36'] },
+  { id: '48h', libelle: '48 h', aide: 'Les 48 dernières heures', cartes: ['obs-rr48', 'obs-raf48'] },
+  { id: '72h', libelle: '72 h', aide: 'Les 72 dernières heures', cartes: ['rr72', 'obs-raf72'] },
+];
 
 const MODES: [Mode, string][] = [
   ['prevision', 'Prévisions'],
@@ -265,6 +274,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   }, [modele, niveau, departement]);
   const [jour, setJour] = useState(0);
   const [alerteParJour, setAlerteParJour] = useState(false);
+  const [periodeBilanChoisie, setPeriodeBilanChoisie] = useState('toutes');
   const [logoChoisi, setLogoChoisi] = useState<string | null>(null);
   /** Taille des pastilles de toutes les cartes : petites (plus de valeurs), normales, grandes (plus lisibles). */
   const [tailleValeurs, setTailleValeurs] = useState(uneCarte ? 160 : 130);
@@ -687,7 +697,13 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     : groupes
         .filter((g) => groupeChoisi === 'tous' || g.groupe === groupeChoisi)
         // Risques : un danger à la fois, avec ses cartes du jour, de la période et des 24 h glissantes.
-        .map((g) => (g.groupe === GROUPE_RISQUES && groupeChoisi === GROUPE_RISQUES ? { ...g, themes: g.themes.filter((t) => dangerDe(t.id) === dangerChoisi && (!alerteParJour || (!(t as ThemePrevision).periode && !(t as ThemePrevision).fenetreHeures))) } : g));
+        .map((g) => {
+          if (mode === 'bilan' && g.groupe.startsWith('danger:') && periodeBilanChoisie !== 'toutes') {
+            const periode = PERIODES_BILAN.find((p) => p.id === periodeBilanChoisie);
+            return { ...g, themes: g.themes.filter((t) => periode?.cartes.includes(t.id)) };
+          }
+          return g.groupe === GROUPE_RISQUES && groupeChoisi === GROUPE_RISQUES ? { ...g, themes: g.themes.filter((t) => dangerDe(t.id) === dangerChoisi && (!alerteParJour || (!(t as ThemePrevision).periode && !(t as ThemePrevision).fenetreHeures))) } : g;
+        });
   // AROME et Harmonie : leurs cartes « jusqu'à la fin du run » s'affichent toujours, même quand le modèle choisi est un autre.
   const modelesRunAffiches = [...new Set(groupesAffiches.flatMap((g) => g.themes).map((t) => modeleAutre(t)).filter((m): m is NonNullable<typeof m> => m != null))].sort().join(',');
   useEffect(() => {
@@ -1015,6 +1031,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                 {[0, 1, 2, 3, 4, 5].map((j) => <button key={j} type="button" aria-pressed={alerteParJour && jour === j} onClick={() => { changerJour(j); setAlerteParJour(true); setGroupeChoisi(GROUPE_RISQUES); }} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${alerteParJour && jour === j ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>J{j}</button>)}
                 <button type="button" aria-pressed={!alerteParJour} onClick={() => { setAlerteParJour(false); setGroupeChoisi(GROUPE_RISQUES); }} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${!alerteParJour ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>Toutes les périodes</button>
               </div>}
+              {mode === 'bilan' && <div className="flex flex-wrap gap-1.5" role="group" aria-label="Période des bilans">
+                {PERIODES_BILAN.map((p) => <button key={p.id} type="button" title={p.aide} aria-pressed={periodeBilanChoisie === p.id} onClick={() => { setPeriodeBilanChoisie(p.id); setGroupeChoisi(`danger:${dangerChoisi}`); }} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${periodeBilanChoisie === p.id ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>{p.libelle}</button>)}
+                <button type="button" aria-pressed={periodeBilanChoisie === 'toutes'} onClick={() => setPeriodeBilanChoisie('toutes')} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${periodeBilanChoisie === 'toutes' ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>Toutes les périodes</button>
+              </div>}
               <fieldset>
               <legend className="sr-only">Thèmes météo</legend>
               <div className="flex flex-wrap gap-1.5">
@@ -1284,9 +1304,9 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           <label className="text-sm font-medium">
             <span className={legende}>Thème</span>
             <select value={mode === 'prevision' && groupeChoisi === GROUPE_RISQUES ? `danger:${dangerChoisi}` : groupeChoisi} onChange={(e) => {
-              if (mode === 'prevision' && e.target.value.startsWith('danger:')) {
+              if (e.target.value.startsWith('danger:')) {
                 setDangerChoisi(e.target.value.slice(7));
-                setGroupeChoisi(GROUPE_RISQUES);
+                setGroupeChoisi(mode === 'prevision' ? GROUPE_RISQUES : e.target.value);
               } else setGroupeChoisi(e.target.value);
             }} className={selectBarre}>
               {mode !== 'climat' && <option value={ESSENTIEL}>{ESSENTIEL} (maxi, mini, rafales, pluie)</option>}
@@ -1568,7 +1588,9 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           {groupesAffiches.map((g) => (
             <section key={g.groupe} className={uneCarte ? 'mt-4' : 'mt-8'}>
               {!uneCarte && <h2 className="border-b border-border pb-1 text-xl font-extrabold">{nomGroupe(g.groupe)}</h2>}
-              {mode === 'bilan' && g.groupe.startsWith('danger:') && g.themes.length === 0 && <p className="mt-4 rounded-xl border border-border bg-surface p-5 text-muted">Les observations {g.groupe === 'danger:risque-orage' ? 'd’orages' : 'de verglas'} ne sont pas disponibles dans les données des stations utilisées pour ces bilans.</p>}
+              {mode === 'bilan' && g.groupe.startsWith('danger:') && g.themes.length === 0 && <p className="mt-4 rounded-xl border border-border bg-surface p-5 text-muted">{['danger:risque-orage', 'danger:risque-verglas'].includes(g.groupe)
+                ? <>Les observations {g.groupe === 'danger:risque-orage' ? 'd’orages' : 'de verglas'} ne sont pas disponibles dans les données des stations utilisées pour ces bilans.</>
+                : <>Aucun bilan de ce phénomène n’est disponible pour cette période. Sélectionnez « Toutes les périodes » pour retrouver les relevés disponibles.</>}</p>}
               {mode === 'bilan' && g.groupe === 'danger:risque-tempete' && <p className="mt-2 text-sm text-muted">Rafales mesurées aux stations pour le suivi des épisodes de vent fort.</p>}
               <div className={`mt-4 grid grid-cols-1 gap-8 ${uneCarte ? 'mx-auto max-w-[1100px]' : 'xl:grid-cols-2'}`}>
                 {g.themes.map((theme) => (
