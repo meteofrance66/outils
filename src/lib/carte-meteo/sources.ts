@@ -161,6 +161,12 @@ const caches = ((globalThis as { __cacheCarteMeteo?: unknown }).__cacheCarteMete
   indexCourant: new Map<ModeleSource, { t: number; runTime: string }>(),
 }) as { memoire: Map<string, Extrait>; enCours: Map<string, Promise<Extrait>>; indexCourant: Map<ModeleSource, { t: number; runTime: string }> };
 const { memoire, enCours, indexCourant } = caches;
+// Partager aussi les échecs : une source absente ne doit pas être interrogée
+// à nouveau pour chacun des 96 départements ni par chaque carte ouverte.
+const etatIndex = ((globalThis as { __etatIndexMeteo?: unknown }).__etatIndexMeteo ??= {
+  enCours: new Map<ModeleSource, Promise<string | null>>(),
+  echecs: new Map<ModeleSource, number>(),
+}) as { enCours: Map<ModeleSource, Promise<string | null>>; echecs: Map<ModeleSource, number> };
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
 const VERSION_CACHE = 'v23'; // v23 : pluie de tous les points de grille du département (commune la plus arrosée) ; // v22 : après-midi = 15 h à 18 h, température moyenne ; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
@@ -185,6 +191,7 @@ async function recuperer(url: string, delaiMs: number): Promise<Response> {
       const reponse = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(delaiMs) });
       if (reponse.ok) return reponse;
       derniere = new Error(`${url} : ${reponse.status}`);
+      if (reponse.status === 404) break;
     } catch (e) {
       derniere = e;
     }
@@ -197,6 +204,17 @@ async function recuperer(url: string, delaiMs: number): Promise<Response> {
 export async function passageCourant(modele: ModeleSource): Promise<string | null> {
   const connu = indexCourant.get(modele);
   if (connu && Date.now() - connu.t < VALIDITE_INDEX_MS) return connu.runTime;
+  const echec = etatIndex.echecs.get(modele);
+  if (echec && Date.now() - echec < 60_000) return connu?.runTime ?? null;
+  const enLecture = etatIndex.enCours.get(modele);
+  if (enLecture) return enLecture;
+  const lecture = lirePassageCourant(modele).finally(() => etatIndex.enCours.delete(modele));
+  etatIndex.enCours.set(modele, lecture);
+  return lecture;
+}
+
+async function lirePassageCourant(modele: ModeleSource): Promise<string | null> {
+  const connu = indexCourant.get(modele);
   try {
     const reponse = await recuperer(`${BASES[modele]}/index.json`, 15_000);
     const index = (await reponse.json()) as { model?: { run_time?: string } | string; model_run?: string; generated_at?: string };
@@ -207,11 +225,13 @@ export async function passageCourant(modele: ModeleSource): Promise<string | nul
     const runTime = [passage, index.generated_at].filter(Boolean).join('|') || null;
     if (runTime) {
       indexCourant.set(modele, { t: Date.now(), runTime });
+      etatIndex.echecs.delete(modele);
       return runTime;
     }
   } catch (e) {
     console.error('Carte météo : index indisponible', modele, e);
   }
+  etatIndex.echecs.set(modele, Date.now());
   return connu?.runTime ?? null;
 }
 
