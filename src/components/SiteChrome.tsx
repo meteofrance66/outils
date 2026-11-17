@@ -34,6 +34,13 @@ export function Header() {
 
 export function Footer() {
   const release = process.env.NEXT_PUBLIC_RELEASE;
+  const dateBuild = process.env.NEXT_PUBLIC_BUILD_DATE;
+  const dateVersion = dateBuild ? new Date(dateBuild) : null;
+  const dateValide = dateVersion && Number.isFinite(dateVersion.getTime());
+  const dateTexte = dateValide ? new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(dateVersion) : null;
   return (
     <footer className="mt-16 bg-anthracite text-sm text-gray-300">
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -45,7 +52,10 @@ export function Footer() {
           <Link href="/confidentialite/" className="underline">Confidentialité et cookies</Link>
           <Link href="/attestation-meteo/" className="underline">Attestation météo</Link>
           <span>© {new Date().getFullYear()} {SITE_NAME}</span>
-          <span title={release ? `Version publiée : ${release}` : undefined}>Version {release ? release.slice(0, 7) : 'locale'}</span>
+          <span title={release ? `Version publiée : ${release} — date de construction` : undefined}>
+            Version {release ? release.slice(0, 7) : 'locale'}
+            {dateTexte && <> · <time dateTime={dateBuild}>{dateTexte}</time> (heure de Paris)</>}
+          </span>
         </p>
       </div>
     </footer>

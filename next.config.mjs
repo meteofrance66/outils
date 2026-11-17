@@ -25,6 +25,10 @@ const csp = (frameAncestors) =>
   ].join('; ');
 
 const nextConfig = {
+  // Figé dans le build : ne pas afficher l'heure de consultation comme date de version.
+  env: {
+    NEXT_PUBLIC_BUILD_DATE: process.env.NEXT_PUBLIC_BUILD_DATE || new Date().toISOString(),
+  },
   output: 'standalone',
   trailingSlash: true,
   poweredByHeader: false,
