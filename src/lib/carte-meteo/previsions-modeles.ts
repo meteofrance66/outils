@@ -32,8 +32,8 @@ export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; d
   { id: 'moyenne', libelle: 'Moyenne des modèles', fournisseur: 'AROME, Harmonie, ARPEGE, CEP, GFS, AROME-IFS, ICON, UKMO, AIFS…', vueDepartement: true },
   { id: 'arome', libelle: 'AROME', fournisseur: 'Météo-France' },
   // HARMONIE DINI du DMI à 2 km, publié pour les Pyrénées-Orientales seulement (dépôt harmonie-dmi-2km).
-  { id: 'harmonie2km', libelle: 'Harmonie 2 km', fournisseur: 'DMI', departements: ['66'] },
-  { id: 'harmonie', libelle: 'Harmonie', fournisseur: 'KNMI' },
+  { id: 'harmonie2km', libelle: 'Harmonie DMI 2 km', fournisseur: 'Danemark, Pyrénées-Orientales', departements: ['66'] },
+  { id: 'harmonie', libelle: 'Harmonie KNMI 5,5 km', fournisseur: 'Pays-Bas' },
   { id: 'arpege', libelle: 'ARPEGE', fournisseur: 'Météo-France' },
   { id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' },
   { id: 'gfs', libelle: 'GFS', fournisseur: 'NOAA' },

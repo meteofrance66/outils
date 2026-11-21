@@ -12,6 +12,7 @@ import { saisieAcceptee } from '@/lib/carte-meteo/limites';
 import { DIRECTIONS_VENT, angleFleche, ressenti as calculerRessenti } from '@/lib/carte-meteo/vent';
 import { LOGOS_PRESETS, logoParDefaut } from '@/lib/carte-meteo/logos';
 import { ChoixPicto } from './ChoixPicto';
+import EtatRunModele from './EtatRunModele';
 import { THEMES_CARTE, averseNuageGris, estPictoImage, estPictoNeige, pictoDepuisPrevision, type JeuPictos, type PictoMeteo, type ThemeCarte } from '@/lib/carte-meteo/pictos';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { CalqueAnnotations, PanneauAnnotations, type Annotation, type ReglagesAnnotation } from './Annotations';
@@ -2132,12 +2133,18 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <fieldset>
               <legend className={legendeBarre}>Modèle</legend>
               <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {MODELES.filter((m) => modeleDisponible(m.id, depVue)).map((m) => (
-                  <label key={m.id} className="text-sm" title={`${m.libelle} — ${m.fournisseur}`}>
-                    <input type="radio" name={nom('modele')} checked={modele === m.id} onChange={() => changerModele(m.id)} className="mr-1.5" />
-                    {m.libelle} ({m.fournisseur})
-                  </label>
-                ))}
+                {MODELES.filter((m) => modeleDisponible(m.id, depVue) || m.departements).map((m) => {
+                  const disponible = modeleDisponible(m.id, depVue);
+                  return (
+                    <label key={m.id} className={`text-sm ${disponible ? '' : 'opacity-50'}`} title={disponible ? `${m.libelle} — ${m.fournisseur}` : `${m.libelle} : publié pour ${m.departements?.includes('66') ? 'les Pyrénées-Orientales' : 'certains départements'} seulement`}>
+                      <input type="radio" name={nom('modele')} checked={modele === m.id} disabled={!disponible} onChange={() => changerModele(m.id)} className="mr-1.5" />
+                      {m.libelle} ({m.fournisseur})
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="mt-2">
+                <EtatRunModele modele={modele} />
               </div>
             </fieldset>
             <fieldset>
