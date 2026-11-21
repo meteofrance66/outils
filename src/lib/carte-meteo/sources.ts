@@ -20,16 +20,16 @@ import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pl
  */
 const BASES: Record<ModeleSource, string> = {
   arome: 'https://raw.githubusercontent.com/alertesmeteo-hub/arome-meteofrance/data',
-  harmonie: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie/data',
-  harmonie2km: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-dmi-2km/data',
-  arpege: 'https://raw.githubusercontent.com/alertesmeteo-hub/arpege-meteo-france/data',
-  cep: 'https://raw.githubusercontent.com/alertesmeteo-hub/cep/data',
-  gfs: 'https://raw.githubusercontent.com/alertesmeteo-hub/gfs/data',
+  harmonie: 'https://raw.githubusercontent.com/meteofrance66/harmonie/data',
+  harmonie2km: 'https://raw.githubusercontent.com/meteofrance66/harmonie-dmi-2km/data',
+  arpege: 'https://raw.githubusercontent.com/meteofrance66/arpege-meteo-france/data',
+  cep: 'https://raw.githubusercontent.com/meteofrance66/ECMWF/data',
+  gfs: 'https://raw.githubusercontent.com/meteofrance66/GFS/data',
   aromeifs: 'https://raw.githubusercontent.com/alertesmeteo-hub/AROME-IFS-2.5-km/data',
-  arpege025: 'https://raw.githubusercontent.com/alertesmeteo-hub/ARPEGE-0.25/data',
+  arpege025: 'https://raw.githubusercontent.com/meteofrance66/ARPEGE-0.25/data',
   icon: 'https://raw.githubusercontent.com/alertesmeteo-hub/ICON-GLOBAL-13-km/data',
   ukmo: 'https://raw.githubusercontent.com/alertesmeteo-hub/UKMO-GLOBAL-10-km/data',
-  aifs: 'https://raw.githubusercontent.com/alertesmeteo-hub/aifs/data',
+  aifs: 'https://raw.githubusercontent.com/meteofrance66/aifs/data',
   iconeu: 'https://raw.githubusercontent.com/alertesmeteo-hub/ICON-EU-7-km/data',
   wrf: 'https://raw.githubusercontent.com/alertesmeteo-hub/WRF-MeteoGalicia-12-km/data',
 };

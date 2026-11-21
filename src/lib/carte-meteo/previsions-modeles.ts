@@ -58,8 +58,8 @@ export const modeleDisponible = (id: ModeleMeteo, dep: string | null): boolean =
   return !m.departements || (dep != null && m.departements.includes(dep));
 };
 
-/** Modèle par défaut d'un département pour aujourd'hui : le plus fin disponible (Harmonie 2 km pour le 66), sinon AROME. */
-export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDisponible('harmonie2km', dep) ? 'harmonie2km' : 'arome');
+/** Modèle par défaut d'un département pour aujourd'hui : le plus fin disponible (Harmonie 2 km pour le 66), sinon Harmonie KNMI (France et régions). */
+export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDisponible('harmonie2km', dep) ? 'harmonie2km' : 'harmonie');
 
 /**
  * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. Les modèles à 48-60 h ne couvrent pas
