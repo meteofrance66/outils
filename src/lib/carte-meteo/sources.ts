@@ -19,7 +19,7 @@ import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pl
  * et on le met en cache (mémoire + disque) tant que le passage du modèle n'a pas changé.
  */
 const BASES: Record<ModeleSource, string> = {
-  arome: 'https://raw.githubusercontent.com/alertesmeteo-hub/arome-meteofrance/data',
+  arome: 'https://raw.githubusercontent.com/meteofrance66/arome-meteofrance/data',
   harmonie: 'https://raw.githubusercontent.com/meteofrance66/harmonie/data',
   harmonie2km: 'https://raw.githubusercontent.com/meteofrance66/harmonie-dmi-2km/data',
   arpege: 'https://raw.githubusercontent.com/meteofrance66/arpege-meteo-france/data',
