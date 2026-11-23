@@ -439,9 +439,11 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     return () => controleur.abort();
   }, [bloque, groupesAvecPeriode, clePeriode, pluiePeriode?.cle, erreurPeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
 
+  // Danger « Neige » des alertes : la neige en montagne (thèmes du groupe Montagne) s'y affiche aussi, avec ses points de montagne.
+  const neigeRisquesMontagne = mode === 'prevision' && groupeChoisi === GROUPE_RISQUES && dangerChoisi === 'risque-neige';
   // Neige en montagne sur une période : points de montagne et période choisie, requête à part.
   const groupesAvecMontagnePeriode =
-    mode === 'prevision' && (groupeChoisi === 'tous' || themesPrevision.some((t) => t.montagne && t.periode && t.groupe === groupeChoisi));
+    mode === 'prevision' && (groupeChoisi === 'tous' || neigeRisquesMontagne || themesPrevision.some((t) => t.montagne && t.periode && t.groupe === groupeChoisi));
   useEffect(() => {
     if (bloque || !groupesAvecMontagnePeriode || montagnePeriode?.cle === cleMontagnePeriode || erreurMontagnePeriode) return;
     const controleur = new AbortController();
@@ -456,7 +458,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   }, [bloque, groupesAvecMontagnePeriode, cleMontagnePeriode, montagnePeriode?.cle, erreurMontagnePeriode, modele, debutPeriodeISO, finPeriodeISO, requeteZone]);
 
   // Cartes de montagne (neige, maxi) : communes au-dessus de 1 000 m, requête à part (les autres cartes utilisent des points de plaine).
-  const groupesAvecMontagne = mode === 'prevision' && (groupeChoisi === 'tous' || themesPrevision.some((t) => (t.montagne || t.pluieEtNeige) && t.groupe === groupeChoisi));
+  const groupesAvecMontagne = mode === 'prevision' && (groupeChoisi === 'tous' || neigeRisquesMontagne || themesPrevision.some((t) => (t.montagne || t.pluieEtNeige) && t.groupe === groupeChoisi));
   useEffect(() => {
     if (bloque || !groupesAvecMontagne || montagne?.cle === cleMontagne || erreurMontagne) return;
     const controleur = new AbortController();
@@ -702,7 +704,13 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
             const periode = PERIODES_BILAN.find((p) => p.id === periodeBilanChoisie);
             return { ...g, themes: g.themes.filter((t) => periode?.cartes.includes(t.id)) };
           }
-          return g.groupe === GROUPE_RISQUES && groupeChoisi === GROUPE_RISQUES ? { ...g, themes: g.themes.filter((t) => dangerDe(t.id) === dangerChoisi && (!alerteParJour || (!(t as ThemePrevision).periode && !(t as ThemePrevision).fenetreHeures))) } : g;
+          return g.groupe === GROUPE_RISQUES && groupeChoisi === GROUPE_RISQUES
+            ? { ...g, themes: [
+                ...g.themes.filter((t) => dangerDe(t.id) === dangerChoisi && (!alerteParJour || (!(t as ThemePrevision).periode && !(t as ThemePrevision).fenetreHeures))),
+                // Neige en montagne (groupe Montagne) : rangée ici avec le danger « Neige ».
+                ...(neigeRisquesMontagne ? themesPrevision.filter((t) => (t.id === 'neige-montagne' || t.id === 'neige-montagne-periode') && (!alerteParJour || !t.periode)) : []),
+              ] }
+            : g;
         });
   // AROME et Harmonie : leurs cartes « jusqu'à la fin du run » s'affichent toujours, même quand le modèle choisi est un autre.
   const modelesRunAffiches = [...new Set(groupesAffiches.flatMap((g) => g.themes).map((t) => modeleAutre(t)).filter((m): m is NonNullable<typeof m> => m != null))].sort().join(',');
