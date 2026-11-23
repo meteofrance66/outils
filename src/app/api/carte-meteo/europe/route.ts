@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import { NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
-import { VILLES_EUROPE, type GrilleEurope, type ModeleEurope } from '@/lib/carte-meteo/isobares';
+import { VILLES_EUROPE, type GrilleEurope } from '@/lib/carte-meteo/isobares';
 import { calculerFronts } from '@/lib/carte-meteo/fronts';
 
 export const dynamic = 'force-dynamic';
@@ -9,28 +9,24 @@ export const dynamic = 'force-dynamic';
 /**
  * Pression au niveau de la mer sur l'Europe (carte des isobares des cartes infos), et pour le style « pluie et
  * températures » (?complet=1) la pluie de la période et la température à 2 m des grandes villes.
- *   - CEP : grilles « values » des cartes Europe du pipeline CEP (ECMWF IFS 0,25°, Mercator -45° à 41°, 28° à 61° N,
- *     toutes les 3 h puis 6 h jusqu'à +240 h), dépôt alertesmeteo-hub/cep, branche data ;
- *   - GFS : pipeline GFS France/Europe (NOAA 0,25°, grille web à 0,5°, toutes les 6 h jusqu'à +360 h), dépôt
- *     alertesmeteo-hub/harmonie-knmi, branche observations.
+ *   - CEP : grilles « CEV1 » (sondes) des cartes Europe du pipeline CEP (ECMWF IFS 0,25°, Mercator -45° à 41°, 28° à 61° N,
+ *     toutes les 3 h puis 6 h jusqu'à +240 h), dépôt meteofrance66/ECMWF, branche data (index : maps-europe/index.json) ;
+ *   - GFS : plus de grilles Europe publiées (le dépôt GFS ne contient que la France) : pas de choix GFS ici.
  *   GET /api/carte-meteo/europe/?modele=cep                  → passage et échéances disponibles
  *   GET /api/carte-meteo/europe/?modele=cep&h=24[&complet=1] → grilles (× 10, régulières en latitude et longitude)
  */
-const SOURCES = {
-  cep: 'https://raw.githubusercontent.com/alertesmeteo-hub/cep/data',
-  gfs: 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-knmi/observations/gfs',
-} as const;
+const SOURCE_CEP = 'https://raw.githubusercontent.com/meteofrance66/ECMWF/data';
 const INDEX_TTL_MS = 10 * 60_000;
 
 interface Echeance {
   h: number;
   valide: string;
-  /** Fichier de l'échéance dans la source (GFS : tous les champs ; CEP : pression). */
+  /** Fichier de l'échéance dans la source : grille de pression (CEV1). */
   fichier: string;
-  /** CEP : grilles de pluie (depuis l'échéance précédente) et de température. */
+  /** Grilles de pluie (depuis l'échéance précédente) et de température. */
   pluie?: string;
   temperature?: string;
-  /** CEP : température, humidité et géopotentiel à 850 hPa (fronts). */
+  /** Température, humidité et géopotentiel à 850 hPa (fronts). */
   t850?: string;
   hr850?: string;
   z850?: string;
@@ -44,8 +40,9 @@ interface Index {
   bornes?: { south: number; west: number; north: number; east: number };
 }
 
-const index = new Map<ModeleEurope, { lu: number; donnees: Index }>();
-/** Grilles déjà extraites (clé : modèle, passage, échéance, style), les plus anciennes retirées au-delà de 40. */
+/** Index du passage CEP, relu toutes les 10 minutes. */
+let indexCourant: { lu: number; donnees: Index } | null = null;
+/** Grilles déjà extraites (clé : passage, échéance, style), les plus anciennes retirées au-delà de 40. */
 const grilles = new Map<string, GrilleEurope>();
 
 async function lire(url: string): Promise<Response> {
@@ -54,52 +51,32 @@ async function lire(url: string): Promise<Response> {
   return r;
 }
 
-async function indexDe(modele: ModeleEurope): Promise<Index> {
-  const connu = index.get(modele);
-  if (connu && Date.now() - connu.lu < INDEX_TTL_MS) return connu.donnees;
-  let donnees: Index;
-  if (modele === 'cep') {
-    const j = (await (await lire(`${SOURCES.cep}/maps-europe/index.json`)).json()) as {
-      run_time: string;
-      generated_at: string;
-      bounds: Index['bornes'];
-      steps: { lead_hour: number; valid_time: string; probes?: Record<string, string> }[];
-    };
-    const etapes = j.steps.filter((s) => s.probes?.pression);
-    donnees = {
-      run: j.run_time,
-      genere: j.generated_at,
-      bornes: j.bounds,
-      echeances: etapes.map((s, k) => ({
-        h: s.lead_hour,
-        valide: s.valid_time,
-        fichier: s.probes!.pression,
-        pluie: s.probes!.pluie_1h,
-        temperature: s.probes!.temperature,
-        t850: s.probes!.temperature_850,
-        hr850: s.probes!.humidite_850,
-        z850: s.probes!.geopotentiel_850,
-        periode: k > 0 ? s.lead_hour - etapes[k - 1].lead_hour : undefined,
-      })),
-    };
-  } else {
-    const j = (await (await lire(`${SOURCES.gfs}/index.json`)).json()) as {
-      run_utc: string;
-      generated_at: string;
-      frames: { forecast_hour: number; valid_utc: string; file: string }[];
-    };
-    donnees = {
-      run: j.run_utc,
-      genere: j.generated_at,
-      echeances: j.frames.map((f, k) => ({
-        h: f.forecast_hour,
-        valide: f.valid_utc,
-        fichier: f.file,
-        periode: k > 0 ? f.forecast_hour - j.frames[k - 1].forecast_hour : undefined,
-      })),
-    };
-  }
-  index.set(modele, { lu: Date.now(), donnees });
+async function indexCep(): Promise<Index> {
+  if (indexCourant && Date.now() - indexCourant.lu < INDEX_TTL_MS) return indexCourant.donnees;
+  const j = (await (await lire(`${SOURCE_CEP}/maps-europe/index.json`)).json()) as {
+    run_time: string;
+    generated_at: string;
+    bounds: Index['bornes'];
+    steps: { lead_hour: number; valid_time: string; probes?: Record<string, string> }[];
+  };
+  const etapes = j.steps.filter((s) => s.probes?.pression);
+  const donnees: Index = {
+    run: j.run_time,
+    genere: j.generated_at,
+    bornes: j.bounds,
+    echeances: etapes.map((s, k) => ({
+      h: s.lead_hour,
+      valide: s.valid_time,
+      fichier: s.probes!.pression,
+      pluie: s.probes!.pluie_1h,
+      temperature: s.probes!.temperature,
+      t850: s.probes!.temperature_850,
+      hr850: s.probes!.humidite_850,
+      z850: s.probes!.geopotentiel_850,
+      periode: k > 0 ? s.lead_hour - etapes[k - 1].lead_hour : undefined,
+    })),
+  };
+  indexCourant = { lu: Date.now(), donnees };
   return donnees;
 }
 
@@ -158,7 +135,7 @@ const temperaturesVilles = (lecteur: (lon: number, lat: number) => number | null
 
 async function grilleCep(idx: Index, e: Echeance, complet: boolean, avecFronts: boolean): Promise<GrilleEurope> {
   const bornes = idx.bornes!;
-  const charger = async (f: string) => lecteurCep(Buffer.from(await (await lire(`${SOURCES.cep}/${f}`)).arrayBuffer()), bornes);
+  const charger = async (f: string) => lecteurCep(Buffer.from(await (await lire(`${SOURCE_CEP}/${f}`)).arrayBuffer()), bornes);
   const pas = 0.25;
   const nLat = Math.round((bornes.north - bornes.south) / pas) + 1;
   const nLon = Math.round((bornes.east - bornes.west) / pas) + 1;
@@ -194,58 +171,41 @@ async function grilleCep(idx: Index, e: Echeance, complet: boolean, avecFronts: 
   };
 }
 
-type FichierGfs = { grid: { latitudes: number[]; longitudes: number[] }; fields: Record<string, (number | null)[][]> };
-
-/** Fichier GFS de l'échéance : grille web à 0,5°, lignes du sud au nord. */
-function grilleGfs(f: FichierGfs, idx: Index, e: Echeance, complet: boolean): GrilleEurope {
-  const { latitudes: lats, longitudes: lons } = f.grid;
-  const aplatir = (champ?: (number | null)[][]) => (champ ?? []).flatMap((ligne) => ligne.map((v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) : null)));
-  const g: GrilleEurope = { run: idx.run, valide: e.valide, h: e.h, lat0: lats[0], lon0: lons[0], pas: lats[1] - lats[0], nLat: lats.length, nLon: lons.length, p: aplatir(f.fields.pressure_hpa) };
-  if (!complet) return g;
-  const t = f.fields.temperature_2m_c;
-  const lecteurT = (lon: number, lat: number) => {
-    const i = Math.round((lat - g.lat0) / g.pas);
-    const j = Math.round((lon - g.lon0) / g.pas);
-    const v = t?.[i]?.[j];
-    return typeof v === 'number' ? v : null;
-  };
-  // Échéance 0 : pas encore de cumul de pluie.
-  return { ...g, pluie: e.h > 0 ? aplatir(f.fields.precipitation_mm) : undefined, periodePluie: e.periode, villes: temperaturesVilles(lecteurT), t: aplatir(t) };
-}
-
 export async function GET(req: Request) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
   if (!rateLimit(`carte-europe:${ip}`, 60, 60_000)) {
     return NextResponse.json({ erreur: 'Trop de requêtes. Réessayez dans une minute.' }, { status: 429, headers: { 'Retry-After': '60' } });
   }
   const url = new URL(req.url);
-  const modele: ModeleEurope = url.searchParams.get('modele') === 'gfs' ? 'gfs' : 'cep';
+  // Seul le CEP publie des grilles Europe : tout autre modèle est refusé clairement.
+  if (url.searchParams.get('modele') === 'gfs') {
+    return NextResponse.json({ erreur: 'Carte Europe : seul le modèle CEP est disponible.' }, { status: 404 });
+  }
   const complet = url.searchParams.get('complet') === '1';
-  // Fronts : CEP seulement (GFS ne publie pas les champs à 850 hPa).
-  const avecFronts = modele === 'cep' && url.searchParams.get('fronts') === '1';
+  // Fronts : CEP (champs à 850 hPa).
+  const avecFronts = url.searchParams.get('fronts') === '1';
   try {
-    const idx = await indexDe(modele);
+    const idx = await indexCep();
     const h = url.searchParams.get('h');
     if (h == null) {
       return NextResponse.json(
-        { modele, run: idx.run, genere: idx.genere, echeances: idx.echeances.map(({ h, valide }) => ({ h, valide })) },
+        { modele: 'cep', run: idx.run, genere: idx.genere, echeances: idx.echeances.map(({ h, valide }) => ({ h, valide })) },
         { headers: { 'Cache-Control': 'public, max-age=300' } }
       );
     }
     const e = idx.echeances.find((x) => String(x.h) === h);
     if (!e || !cheminSur(e.fichier)) return NextResponse.json({ erreur: 'Échéance inconnue.' }, { status: 404 });
 
-    const cle = `${modele}|${idx.run}|${idx.genere}|${e.h}|${complet ? 'complet' : 'pression'}|${avecFronts ? 'fronts' : ''}`;
+    const cle = `${idx.run}|${idx.genere}|${e.h}|${complet ? 'complet' : 'pression'}|${avecFronts ? 'fronts' : ''}`;
     let grille = grilles.get(cle);
     if (!grille) {
-      grille =
-        modele === 'cep' ? await grilleCep(idx, e, complet, avecFronts) : grilleGfs((await (await lire(`${SOURCES.gfs}/${e.fichier}`)).json()) as FichierGfs, idx, e, complet);
+      grille = await grilleCep(idx, e, complet, avecFronts);
       grilles.set(cle, grille);
       if (grilles.size > 40) grilles.delete(grilles.keys().next().value!);
     }
     return NextResponse.json(grille, { headers: { 'Cache-Control': 'public, max-age=600' } });
   } catch (erreur) {
-    console.error('Carte Europe', modele, erreur);
+    console.error('Carte Europe cep', erreur);
     return NextResponse.json({ erreur: 'Données du modèle momentanément indisponibles.' }, { status: 503 });
   }
 }

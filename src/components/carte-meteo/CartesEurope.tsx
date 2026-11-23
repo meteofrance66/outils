@@ -38,8 +38,8 @@ interface Echeance {
 const HEURES_UTC = [0, 6, 12, 18];
 const NOMBRE_JOURS = 16;
 const MODELES_EUROPE: { id: ModeleEurope; libelle: string; detail: string }[] = [
+  // Seul le CEP publie des grilles Europe (le GFS ne fournit que la France).
   { id: 'cep', libelle: 'CEP (ECMWF)', detail: 'jusqu’à J+10' },
-  { id: 'gfs', libelle: 'GFS (NOAA)', detail: 'jusqu’à J+15' },
 ];
 const NOM_MODELE: Record<ModeleEurope, string> = { cep: 'CEP', gfs: 'GFS' };
 
