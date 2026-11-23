@@ -25,14 +25,19 @@ const BASES: Record<ModeleSource, string> = {
   arpege: 'https://raw.githubusercontent.com/meteofrance66/arpege-meteo-france/data',
   cep: 'https://raw.githubusercontent.com/meteofrance66/ECMWF/data',
   gfs: 'https://raw.githubusercontent.com/meteofrance66/GFS/data',
-  aromeifs: 'https://raw.githubusercontent.com/alertesmeteo-hub/AROME-IFS-2.5-km/data',
+  aromeifs: 'https://data.alertes-meteo.com/modeles/AROME-IFS-2.5-km',
   arpege025: 'https://raw.githubusercontent.com/meteofrance66/ARPEGE-0.25/data',
-  icon: 'https://raw.githubusercontent.com/alertesmeteo-hub/ICON-GLOBAL-13-km/data',
-  ukmo: 'https://raw.githubusercontent.com/alertesmeteo-hub/UKMO-GLOBAL-10-km/data',
+  icon: 'https://data.alertes-meteo.com/modeles/ICON-GLOBAL-13-km',
+  ukmo: 'https://data.alertes-meteo.com/modeles/UKMO-GLOBAL-10-km',
   aifs: 'https://raw.githubusercontent.com/meteofrance66/aifs/data',
-  iconeu: 'https://raw.githubusercontent.com/alertesmeteo-hub/ICON-EU-7-km/data',
+  iconeu: 'https://raw.githubusercontent.com/meteofrance66/ICON-EU-7-km/data',
   wrf: 'https://raw.githubusercontent.com/alertesmeteo-hub/WRF-MeteoGalicia-12-km/data',
 };
+/** Secours Pyrénées-Orientales : si le dépôt GitHub du modèle ne répond pas, copie du fichier du 66 sur le serveur de données (VPS2). */
+const BASES_SECOURS: Partial<Record<ModeleSource, string>> = {
+  arome: 'https://data.alertes-meteo.com/modeles/arome-meteofrance',
+};
+
 const LIBELLES: Record<ModeleSource, string> = {
   arome: 'AROME 0,01° (Météo-France)',
   harmonie: 'HARMONIE-AROME (KNMI)',
@@ -129,7 +134,7 @@ function referenceCommunes(dep: string): Promise<Map<string, { population: numbe
   const connue = referencesCommunes.get(dep);
   if (connue) return connue;
   const lecture = (async () => {
-    const f = (await (await recuperer(`${BASES.arome}/departements/${dep}.json`, 60_000)).json()) as FichierDepartement;
+    const f = (await (await recupererModele('arome', `/departements/${dep}.json`, 60_000)).json()) as FichierDepartement;
     return new Map(f.communes.map(([code, , , population, , , pointId]) => [code, { population, altitude: f.points?.[pointId]?.[3] ?? 0 }]));
   })();
   referencesCommunes.set(dep, lecture);
@@ -200,6 +205,18 @@ async function recuperer(url: string, delaiMs: number): Promise<Response> {
   throw derniere instanceof Error ? derniere : new Error(String(derniere));
 }
 
+/** Lit un fichier d'un modèle sur sa base principale, puis sur la copie du VPS2 si elle existe et que la première échoue. */
+async function recupererModele(modele: ModeleSource, chemin: string, delaiMs: number): Promise<Response> {
+  try {
+    return await recuperer(`${BASES[modele]}${chemin}`, delaiMs);
+  } catch (e) {
+    const secours = BASES_SECOURS[modele];
+    // Le VPS2 ne publie que les Pyrénées-Orientales (66) pour ce modèle : pas de secours pour les autres départements ni pour l'index.
+    if (!secours || chemin !== '/departements/66.json') throw e;
+    return await recuperer(`${secours}${chemin}`, delaiMs);
+  }
+}
+
 /** Passage du modèle en cours (run_time de l'index) ; en cas d'échec on garde le dernier connu. */
 export async function passageCourant(modele: ModeleSource): Promise<string | null> {
   const connu = indexCourant.get(modele);
@@ -216,7 +233,7 @@ export async function passageCourant(modele: ModeleSource): Promise<string | nul
 async function lirePassageCourant(modele: ModeleSource): Promise<string | null> {
   const connu = indexCourant.get(modele);
   try {
-    const reponse = await recuperer(`${BASES[modele]}/index.json`, 15_000);
+    const reponse = await recupererModele(modele, '/index.json', 15_000);
     const index = (await reponse.json()) as { model?: { run_time?: string } | string; model_run?: string; generated_at?: string };
     // Version des données = passage du modèle + date de publication : les pipelines publient d'abord un passage tronqué
     // (ex. GFS sur 5 jours) puis le complètent sous le même run_time ; sans generated_at, le cache gardait la version tronquée.
@@ -524,7 +541,7 @@ async function lireExtraitDepartement(modele: ModeleSource, dep: string): Promis
     return surDisque;
   }
   try {
-    const reponse = await recuperer(`${BASES[modele]}/departements/${dep}.json`, 60_000);
+    const reponse = await recupererModele(modele, `/departements/${dep}.json`, 60_000);
     const brut = (await reponse.json()) as FichierDepartement | FichierIconEu;
     const fichier = 'time' in brut ? await depuisIconEu(brut, dep) : brut;
     const extrait = extraire(dep, fichier, runTime ?? new Date().toISOString());
