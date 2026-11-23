@@ -841,6 +841,55 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     return () => clearTimeout(minuteur);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [figee, aujourdhui, mode, niveau, region, departement, modele, jour, logoChoisi, tailleValeurs, tailleTableau, sansTableau, chiffres, reliefAlt, dureeRisque, zonageFin, horizon, altitudeMax, groupeChoisi, carteChoisie, filtreGroupe, affichage, periodePluie, moisBilan, runModele, previsions, cumuls, montagne, pluiePeriode, montagnePeriode, bilans, retouchesCartes, figeeLe]);
+  // ── Choix gardés d'une visite à l'autre (pages à plusieurs cartes) ────────────────────────────────────────────────────
+  // Sans ça, revenir sur la page (retour arrière, autre onglet du menu puis retour) remettait tous les choix à zéro : danger, zone, modèle, jour…
+  // Gardés dans l'onglet (sessionStorage), par page : ?cartes=alertes, ?cartes=europe… ont chacune leurs choix. Le lien du menu garde la main
+  // sur la catégorie et le thème qu'il demande ; tout le reste revient tel que l'utilisateur l'avait laissé.
+  const [selectionLue, setSelectionLue] = useState(false);
+  const cleSelection = `cartes-info-choix:${modeInitial ?? ''}:${departementInitial ?? ''}`;
+  useEffect(() => {
+    if (uneCarte) return;
+    try {
+      const brut = sessionStorage.getItem(cleSelection);
+      const e = brut ? (JSON.parse(brut) as Record<string, unknown>) : null;
+      if (e) {
+        const prendre = <T,>(champ: string, appliquer: (valeur: T) => void) => {
+          if (champ in e) appliquer(e[champ] as T);
+        };
+        if (!modeInitial) {
+          prendre<Mode>('mode', setMode);
+          prendre<string>('groupeChoisi', setGroupeChoisi);
+        }
+        if (!departementInitial) {
+          prendre<Niveau>('niveau', setNiveau);
+          prendre<string>('region', setRegion);
+          prendre<string>('departement', setDepartement);
+        }
+        prendre<string>('dangerChoisi', setDangerChoisi);
+        prendre<ModeleMeteo>('modele', setModele);
+        prendre<number>('jour', setJour);
+        prendre<'jour' | 'periode' | '24h'>('dureeRisque', setDureeRisque);
+        prendre<Horizon>('horizon', setHorizon);
+        if (!alertesDemandees) {
+          prendre<boolean>('chiffres', setChiffres);
+          prendre<boolean>('zonageFin', setZonageFin);
+        }
+      }
+    } catch {
+      // Rien de gardé ou stockage bloqué : choix par défaut.
+    }
+    setSelectionLue(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    // Rien n'est écrit avant la lecture : sinon les valeurs par défaut écraseraient les choix gardés.
+    if (uneCarte || !selectionLue) return;
+    try {
+      sessionStorage.setItem(cleSelection, JSON.stringify({ mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, dureeRisque, horizon, chiffres, zonageFin }));
+    } catch {
+      // Stockage bloqué (navigation privée) : les choix restent valables tant que la page est ouverte.
+    }
+  }, [uneCarte, selectionLue, cleSelection, mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, dureeRisque, horizon, chiffres, zonageFin]);
   /** La carte affichée a toutes ses données : seule une carte complète peut être figée. */
   const peutFiger = uneCarte && !chargement && !erreurAffichee && (mode !== 'prevision' || (!!carteEffective && !!pointsPrevision[carteEffective.id]));
   /** Instant où la carte a été figée : « Carte élaborée le » et les fenêtres « depuis maintenant » le gardent au lieu de suivre l'horloge. */
