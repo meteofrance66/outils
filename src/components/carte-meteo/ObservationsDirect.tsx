@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { GROUPE_OBS, GROUPE_PLUIE_DIRECT, RUBRIQUES_OBS, THEMES_BILAN } from '@/lib/carte-meteo/cartes-info';
 import { depStation, normaliserNom, pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
@@ -65,6 +65,12 @@ export default function ObservationsDirect() {
       setImport({ etat: 'erreur' });
     }
   };
+
+  // Import automatique une fois les relevés chargés (le bouton reste pour relancer l'import).
+  useEffect(() => {
+    if (bilans && !complements) importer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bilans]);
 
   /** Points de chaque carte ; les températures sont contrôlées par les stations voisines (pas la pluie ni les rafales). */
   const pointsEtAjouts = useMemo(() => {
