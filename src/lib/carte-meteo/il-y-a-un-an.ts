@@ -10,7 +10,7 @@ import { temperaturePlausible } from './limites';
  * Une année se lit une fois (≈ 4 Ko par station, ≈ 1 800 stations) en arrière-plan, puis reste en mémoire et sur disque :
  * une année passée ne change plus. En attendant la première lecture, les cartes restent vides.
  */
-const CLIMATO_URL = (process.env.CLIMATO_DATA_URL ?? 'https://raw.githubusercontent.com/alertesmeteo-hub/climato/data').replace(/\/$/, '');
+const CLIMATO_URL = (process.env.CLIMATO_DATA_URL ?? 'https://data.alertes-meteo.com/climato/data').replace(/\/$/, '');
 const DOSSIER = join(tmpdir(), 'outils-un-an');
 const CONCURRENCE = 8;
 

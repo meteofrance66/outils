@@ -288,7 +288,7 @@ export async function getSnapshot(): Promise<ObsSnapshot> {
  * téléchargés en arrière-plan pour les stations classées et mis en cache 7 jours ;
  * 2) fichier manuel (RECORDS_FILE, défaut data/records.json), prioritaire station par station.
  */
-const CLIMATO_URL = (process.env.CLIMATO_DATA_URL ?? 'https://raw.githubusercontent.com/alertesmeteo-hub/climato/data').replace(/\/$/, '');
+const CLIMATO_URL = (process.env.CLIMATO_DATA_URL ?? 'https://data.alertes-meteo.com/climato/data').replace(/\/$/, '');
 const CLIMATO_FILE = path.join(DIR, 'climato-records.json');
 const CLIMATO_TTL = 7 * 24 * 3600_000;
 /** Format du cache : à changer quand fromClimato lit de nouveaux champs (v2 : normales de pluie et d'ensoleillement). */

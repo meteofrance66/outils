@@ -93,7 +93,7 @@ export default async function PageTendancesParTheme({ searchParams }: { searchPa
       )}
 
       <p className="mt-8 text-xs text-muted">
-        Prévisions : {infos.libelle} ({infos.fournisseur}), paquets départementaux publiés par alertesmeteo-hub, une valeur par département (sa préfecture). Pictos : le temps le
+        Prévisions : {infos.libelle} ({infos.fournisseur}), paquets départementaux publiés par Alertes Météo, une valeur par département (sa préfecture). Pictos : le temps le
         plus fréquent des journées de la période. Au-delà de quelques jours, les prévisions d&apos;un modèle déterministe sont de moins en moins fiables : à lire comme une tendance.
       </p>
     </>

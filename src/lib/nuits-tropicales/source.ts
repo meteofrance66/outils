@@ -10,7 +10,7 @@ import type { DonneesNuits } from './types';
  *  - indicateur.json : indicateur national (moyenne d'un panel de stations de basse altitude), référence 1991-2020, année en cours.
  * Aucun appel depuis le navigateur : tout passe par le serveur, avec cache mémoire.
  */
-const BASE = (process.env.NUITS_TROPICALES_URL || 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-knmi/nuits-tropicales-data').replace(/\/$/, '');
+const BASE = (process.env.NUITS_TROPICALES_URL || 'https://data.alertes-meteo.com/nuits-tropicales').replace(/\/$/, '');
 const TTL_MS = 30 * 60_000;
 const DELAI_MS = 30_000;
 

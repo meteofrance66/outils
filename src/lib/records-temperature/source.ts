@@ -11,8 +11,8 @@ import { estDate, estObjet, jourDepuis, menacesDepuis, nombre, texte, type Json 
  * Records menacés : menaces.json de la branche records-menaces-data (prévisions de nos modèles comparées aux records, toutes les 3 heures).
  * Aucun appel depuis le navigateur : tout passe par le serveur, avec cache mémoire.
  */
-const BASE = (process.env.RECORDS_TEMPERATURE_URL || 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-knmi/observations/records_temperature').replace(/\/$/, '');
-const BASE_MENACES = (process.env.RECORDS_MENACES_URL || 'https://raw.githubusercontent.com/alertesmeteo-hub/harmonie-knmi/records-menaces-data').replace(/\/$/, '');
+const BASE = (process.env.RECORDS_TEMPERATURE_URL || 'https://data.alertes-meteo.com/records-temperature').replace(/\/$/, '');
+const BASE_MENACES = (process.env.RECORDS_MENACES_URL || 'https://data.alertes-meteo.com/records-menaces').replace(/\/$/, '');
 const TTL_MENACES_MS = 5 * 60_000;
 const DELAI_PETIT_MS = 20_000;
 const DELAI_ARCHIVE_MS = 90_000;
