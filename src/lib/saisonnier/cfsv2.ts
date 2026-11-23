@@ -4,7 +4,7 @@
  * Ici : lecture prudente du JSON et géométrie de l'Occitanie pour les cartes (calculée côté serveur).
  */
 
-export const CFSV2_URL = process.env.CFSV2_URL ?? 'https://raw.githubusercontent.com/alertesmeteo-hub/cfsv2/data/occitanie.json';
+export const CFSV2_URL = process.env.CFSV2_URL ?? 'https://gitlab.com/alertes-meteo-group/cfsv2/-/raw/data/occitanie.json';
 
 export type EcartZone = {
   t2m: { anomalie: number | null };

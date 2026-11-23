@@ -47,7 +47,7 @@ export default async function PageCartesInfo({ searchParams }: { searchParams: P
         <CartesInfo aujourdhui={aujourdhuiParis()} modeInitial={cartes} />
       </div>
       <p className="mt-8 text-xs text-muted">
-        Prévisions : paquets départementaux alertesmeteo-hub (AROME Météo-France, Harmonie KNMI, CEP ECMWF, GFS NOAA). Neige : estimation d&apos;environ 1 cm de
+        Prévisions : paquets départementaux Alertes Météo (AROME Météo-France, Harmonie KNMI, CEP ECMWF, GFS NOAA). Neige : estimation d&apos;environ 1 cm de
         neige par mm d&apos;eau. Bilans : observations des stations Météo-France (principales et secondaires), mêmes périodes que les{' '}
         <Link href="/classements/" className="underline">
           classements

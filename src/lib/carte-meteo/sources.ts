@@ -31,7 +31,7 @@ const BASES: Record<ModeleSource, string> = {
   ukmo: 'https://data.alertes-meteo.com/modeles/UKMO-GLOBAL-10-km',
   aifs: 'https://raw.githubusercontent.com/meteofrance66/aifs/data',
   iconeu: 'https://raw.githubusercontent.com/meteofrance66/ICON-EU-7-km/data',
-  wrf: 'https://raw.githubusercontent.com/alertesmeteo-hub/WRF-MeteoGalicia-12-km/data',
+  wrf: 'https://gitlab.com/alertes-meteo-group/WRF-MeteoGalicia-12-km/-/raw/data',
 };
 /** Secours Pyrénées-Orientales : si le dépôt GitHub du modèle ne répond pas, copie du fichier du 66 sur le serveur de données (VPS2). */
 const BASES_SECOURS: Partial<Record<ModeleSource, string>> = {

@@ -2445,7 +2445,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
           </label>
         </div>
         <p className="mt-3 text-xs text-muted">
-          Prévisions : {MODELES.find((m) => m.id === modele)?.libelle} ({MODELES.find((m) => m.id === modele)?.fournisseur}), paquets départementaux alertesmeteo-hub. Fond de carte : {CREDITS_COUCHES[couche]}. Cours d'eau : © IGN (Géoplateforme, Licence ouverte).
+          Prévisions : {MODELES.find((m) => m.id === modele)?.libelle} ({MODELES.find((m) => m.id === modele)?.fournisseur}), paquets départementaux Alertes Météo. Fond de carte : {CREDITS_COUCHES[couche]}. Cours d'eau : © IGN (Géoplateforme, Licence ouverte).
           Contours : IGN Admin Express (Licence ouverte Etalab).{enDepartement && ' Communes : prévisions au point de commune.'}
         </p>
       </div>

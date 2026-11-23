@@ -4,7 +4,7 @@
  */
 import type { Cellule } from './cfsv2';
 
-export const CFSV2_FRANCE_URL = process.env.CFSV2_FRANCE_URL ?? 'https://raw.githubusercontent.com/alertesmeteo-hub/cfsv2/data/france.json';
+export const CFSV2_FRANCE_URL = process.env.CFSV2_FRANCE_URL ?? 'https://gitlab.com/alertes-meteo-group/cfsv2/-/raw/data/france.json';
 
 export type EcheanceFrance = { cle: string; titre: string; sousTitre?: string; t2m: number | null; pluiePct: number | null; cellules: Cellule[]; etiquettes?: string[] };
 export type SaisonnierFrance = { init: string; hebdo: EcheanceFrance[]; mensuel: EcheanceFrance[] };
