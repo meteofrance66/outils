@@ -273,6 +273,7 @@ export default function ObservationsDirect() {
             policeValeurs={policeV}
             tailleNoms={tailleNoms}
             zone={zone.zone}
+            carre
             points={points[theme.id] ?? []}
             sousTitre={sousTitre(theme.id)}
             logoId={logoId}
@@ -321,6 +322,7 @@ export default function ObservationsDirect() {
             policeValeurs={policeV}
             tailleNoms={tailleNoms}
             zone={zone.zone}
+            carre
             points={points[pluie.id] ?? []}
             sousTitre={sousTitre(pluie.id)}
             logoId={logoId}

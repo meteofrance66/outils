@@ -193,6 +193,8 @@ interface Props {
   retouchesInitiales?: RetouchesCarte;
   /** Appelé à chaque retouche (et quand elles sont remises à zéro), pour que la page puisse les garder avec la carte figée. */
   onRetouches?: (retouches: RetouchesCarte) => void;
+  /** Région (ou grande zone) : carte au format carré 1:1 (1280 × 1280) au lieu de 16:9. Sans effet pour la France et les départements. */
+  carre?: boolean;
 }
 
 /** Taille (em de la pastille) du picto posé au-dessus d'une valeur. */
@@ -211,6 +213,8 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
 /** Zones et fourchettes, vue France : cadrage laissant la colonne de gauche au grand picto (thermomètre…) et le haut au titre. */
 const ZONE_FRANCE_ZONES = { gauche: 150, haut: 100, droite: LARGEUR_FRANCE - 12, bas: HAUTEUR_CARTE - 34 };
+/** Région en format carré : même colonne de gauche (classement, légende) que le 16:9, cadrage sur toute la hauteur. */
+const ZONE_UTILE_CARRE = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: LARGEUR_CARTE - 30 };
 const POLICE_ZONES = 'Arial, Helvetica, sans-serif';
 
 /** Titre d'une carte en zones (hors bulletins de températures) : titre du thème en minuscules (« Cumuls de pluie »). */
@@ -222,7 +226,7 @@ function titreEnMinuscules(titre: string): string {
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, modelePrevision, periodePrevision, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, modelePrevision, periodePrevision, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches, carre = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -344,6 +348,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   const enDepartement = zone.startsWith('dep:');
   const niveau = enFrance ? 'france' : enDepartement ? 'departement' : 'region';
   const largeur = enFrance ? LARGEUR_FRANCE : LARGEUR_CARTE;
+  // Région en 1:1 : carte carrée (la hauteur devient celle de la largeur).
+  const carreActif = carre && !enFrance && !enDepartement;
+  const hauteurCarte = carreActif ? LARGEUR_CARTE : HAUTEUR_CARTE;
 
   useEffect(() => {
     const colonne = colonneRef.current;
@@ -370,10 +377,11 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     const boite = unirBoites(contoursDep.filter((c) => selection.has(c.code)).map((c) => c.boite)) ?? BOITE_FRANCE;
     // Régions et départements : la colonne de gauche reste libre pour le classement et la légende.
     // Zones et fourchettes, France : la colonne de gauche reste libre pour le grand thermomètre, le haut pour le titre.
-    if (pluiePro) return ajusterVue(boite, { gauche: 190, haut: 150, droite: largeur - 18, bas: HAUTEUR_CARTE - 62 }, 0.01);
+    if (pluiePro) return ajusterVue(boite, { gauche: 190, haut: 150, droite: largeur - 18, bas: hauteurCarte - 62 }, 0.01);
     if (enZones && enFrance) return ajusterVue(boite, ZONE_FRANCE_ZONES, 0.01);
+    if (carreActif) return ajusterVue(boite, ZONE_UTILE_CARRE, 0.06);
     return enFrance ? ajusterVue(boite, ZONE_FRANCE, 0.01) : ajusterVue(boite, ZONE_UTILE, enDepartement ? 0.03 : 0.06);
-  }, [contoursDep, selection, enFrance, enDepartement, enZones, pluiePro, largeur]);
+  }, [contoursDep, selection, enFrance, enDepartement, enZones, pluiePro, largeur, carreActif]);
 
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);
   const logoUrl = logo?.fichier || null;
@@ -543,7 +551,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     : { x: MARGE_COLONNE, y: rectTop.y + (hauteurTop ? hauteurTop + 10 : 0), w: largeurSeuils, h: hauteurSeuils };
   // Légende ajustée à son plus long libellé (pastille de couleur + texte en 13 px).
   const largeurLegende = Math.max(118, Math.round(48 + Math.max(...legende.map((x) => x.libelle.length)) * 6.7));
-  const rectLegende: Rect = { x: MARGE_COLONNE, y: HAUTEUR_CARTE - 44 - hauteurLegende, w: largeurLegende, h: hauteurLegende };
+  const rectLegende: Rect = { x: MARGE_COLONNE, y: hauteurCarte - 44 - hauteurLegende, w: largeurLegende, h: hauteurLegende };
 
   // Texte IA (à la demande) : posé en bas, à droite de la légende.
   const nomZone = enFrance ? 'France métropolitaine' : enDepartement ? `${DEPARTEMENTS_FR[zone.slice(4)]} (${zone.slice(4)})` : zone.startsWith('gz:') ? grandeZone(zone.slice(3))?.nom ?? zone.slice(3) : zone.slice(4);
@@ -603,7 +611,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
       return n < parDepartementMax;
     });
     for (const p of top) if (!candidats.includes(p)) candidats.push(p);
-    const ecran = candidats.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > 0 && e.x < largeur && e.y > 0 && e.y < HAUTEUR_CARTE);
+    const ecran = candidats.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > 0 && e.x < largeur && e.y > 0 && e.y < hauteurCarte);
     // Puis répartis sur la zone : les N premiers sont toujours bien espacés.
     const rang = new Map(ordreRepartition(ecran.map((e) => ({ code: e.p.code, x: e.x, y: e.y }))).map((code, i) => [code, i]));
     const codesTop = new Set(top.map((p) => p.code));
@@ -633,8 +641,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
       });
     const obstacles: Rect[] = [
       rectTitre,
-      { x: largeur / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 },
-      ...(affichage?.dateElaboration ? [{ x: largeur - 330, y: HAUTEUR_CARTE - 34, w: 320, h: 34 }] : []),
+      { x: largeur / 2 - 150, y: hauteurCarte - 36, w: 300, h: 36 },
+      ...(affichage?.dateElaboration ? [{ x: largeur - 330, y: hauteurCarte - 34, w: 320, h: 34 }] : []),
       rectLegende,
       ...(hauteurTop ? [rectTop] : []),
       ...(hauteurSeuils ? [rectSeuils] : []),
@@ -649,7 +657,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
       const chemins = contoursDep.map((c) => new Path2D(c.d));
       surTerre = (_e, x, y) => chemins.some((ch) => ctx.isPointInPath(ch, (x - vue.tx) / vue.echelle, (y - vue.ty) / vue.echelle));
     }
-    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: HAUTEUR_CARTE }, taille * (avecReperes ? 7 : theme.toutes ? 1.6 : 0.9), surTerre, avecReperes);
+    const positions = placerSansChevauchement(elements, obstacles, { largeur, hauteur: hauteurCarte }, taille * (avecReperes ? 7 : theme.toutes ? 1.6 : 0.9), surTerre, avecReperes);
     const parCode = new Map(ecran.map((e) => [e.p.code, e.p]));
     const origine = new Map(ecran.map((e) => [e.p.code, { ox: e.x, oy: e.y }]));
     let restantes = plafond;
@@ -704,9 +712,9 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     });
     const obstacles: Rect[] = [
       rectTitreZones,
-      ...(pluiePro ? [{ x: 14, y: 310, w: 185, h: 280 }, { x: 0, y: HAUTEUR_CARTE - 60, w: largeur, h: 60 }] : [rectThermometre]),
-      { x: largeur / 2 - 150, y: HAUTEUR_CARTE - 36, w: 300, h: 36 },
-      ...(affichage?.dateElaboration ? [{ x: largeur - 330, y: HAUTEUR_CARTE - 34, w: 320, h: 34 }] : []),
+      ...(pluiePro ? [{ x: 14, y: 310, w: 185, h: 280 }, { x: 0, y: hauteurCarte - 60, w: largeur, h: 60 }] : [rectThermometre]),
+      { x: largeur / 2 - 150, y: hauteurCarte - 36, w: 300, h: 36 },
+      ...(affichage?.dateElaboration ? [{ x: largeur - 330, y: hauteurCarte - 34, w: 320, h: 34 }] : []),
       ...(logoUrl ? [{ x: largeur - 24 - 240, y: 21, w: 240, h: hauteurLogo }] : []),
       ...(texteIA.rect ? [texteIA.rect] : []),
     ];
@@ -720,7 +728,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     const positions = placerSansChevauchement(
       elements.map((e) => ({ code: e.code, x: e.x, y: e.y, gauche: e.l / 2, droite: e.l / 2, haut: e.h / 2, bas: e.h / 2, priorite: e.priorite })),
       obstacles,
-      { largeur, hauteur: HAUTEUR_CARTE },
+      { largeur, hauteur: hauteurCarte },
       70,
       ctx ? (e, x, y) => (chemins.get(e.code) ?? []).some((ch) => ctx.isPointInPath(ch, (x - vue.tx) / vue.echelle, (y - vue.ty) / vue.echelle)) : undefined
     );
@@ -738,7 +746,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     setEnExport(true);
     try {
       if (pluiePro) await Promise.all([500, 600, 700, 800].map((poids) => document.fonts.load(`${poids} 24px "Montserrat Meteo"`)));
-      await exporterEnJpg(carteRef.current, `${prefixeFichier}-${normaliser(theme.court).replace(/ /g, '-')}`, largeur, HAUTEUR_CARTE);
+      await exporterEnJpg(carteRef.current, `${prefixeFichier}-${normaliser(theme.court).replace(/ /g, '-')}`, largeur, hauteurCarte);
     } catch (e) {
       console.error('Export de la carte info', e);
       setErreurExport("L'export a échoué (fond de carte injoignable ?). Réessayez dans un instant.");
@@ -817,6 +825,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
         carteRef={carteRef}
         facteur={facteur}
         largeur={largeur}
+        hauteur={hauteurCarte}
         fleuves={enZones ? null : fleuves}
         // Comme la carte météo : les quatre grands fleuves en France et en région, fleuves et rivières principales en département.
         densiteFleuves={affichage?.fleuves && affichage.fleuves !== 'aucun' ? affichage.fleuves : zone.startsWith('dep:') ? 'moyen' : 'faible'}
@@ -861,7 +870,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
           </div>
         )}
         {avecReperes && (
-          <svg className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 3 }} width={largeur} height={HAUTEUR_CARTE} aria-hidden>
+          <svg className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 3 }} width={largeur} height={hauteurCarte} aria-hidden>
             <defs>
               <marker id="cinfo-pointe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
                 <path d="M0 1 L10 5 L0 9 z" fill="#fff" stroke="#000" strokeWidth="1.2" />
@@ -974,7 +983,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
             </>}
             {zonesTemp.length === 0 && (
               // Aucune zone (pas de neige, pas de risque…) : on l'écrit, plutôt que de laisser une carte grise muette.
-              <div style={{ position: 'absolute', left: largeur / 2 + (enFrance ? 60 : 0), top: HAUTEUR_CARTE / 2, transform: 'translate(-50%, -50%)', zIndex: 4, fontFamily: POLICE_ZONES, fontSize: 22, fontWeight: 800, lineHeight: 1, padding: '0.3em 0.7em', borderRadius: 999, background: '#1d5fae', color: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', whiteSpace: 'nowrap' }}>
+              <div style={{ position: 'absolute', left: largeur / 2 + (enFrance ? 60 : 0), top: hauteurCarte / 2, transform: 'translate(-50%, -50%)', zIndex: 4, fontFamily: POLICE_ZONES, fontSize: 22, fontWeight: 800, lineHeight: 1, padding: '0.3em 0.7em', borderRadius: 999, background: '#1d5fae', color: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', whiteSpace: 'nowrap' }}>
                 {pluiePro ? 'Aucune zone de pluie notable' : theme.paliers.find((x) => x.neutre)?.libelle ?? 'Aucune valeur notable'}
               </div>
             )}

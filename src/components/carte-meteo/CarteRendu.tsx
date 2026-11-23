@@ -230,6 +230,8 @@ interface Props {
   facteur: number;
   /** Largeur de l'image : plus étroite en vue France (carte cadrée serrée, coupée sur les côtés). */
   largeur?: number;
+  /** Hauteur de l'image (720 en 16:9 ; égale à la largeur en 1:1, cartes de régions). */
+  hauteur?: number;
   /** Cours d'eau principaux (BD TOPO IGN) en tracés SVG « monde », par importance (1 = fleuves) ; null = masqués. */
   /** Texte centré en bas de l'image (adresse du site). */
   pied?: string;
@@ -470,6 +472,7 @@ export default function CarteRendu({
   carteRef,
   facteur,
   largeur = LARGEUR_CARTE,
+  hauteur = HAUTEUR_CARTE,
   pied = '',
   titreADroite = false,
   titreEchelle = 1,
@@ -540,8 +543,8 @@ export default function CarteRendu({
   const [partout, setPartout] = useState(false);
   const nomMer = etiquetteMer && !styleFond && !theme;
   const terresEurope = useTerres(styleFond != null || nomMer);
-  const merVisible = useMemo(() => (styleFond || nomMer ? positionMer(terresEurope, vue, largeur, HAUTEUR_CARTE) : null), [styleFond, nomMer, terresEurope, vue, largeur]);
-  const atlantiqueVisible = useMemo(() => (etiquetteMer && !theme ? positionMer(terresEurope, vue, largeur, HAUTEUR_CARTE, 'atlantique') : null), [etiquetteMer, theme, terresEurope, vue, largeur]);
+  const merVisible = useMemo(() => (styleFond || nomMer ? positionMer(terresEurope, vue, largeur, hauteur) : null), [styleFond, nomMer, terresEurope, vue, largeur]);
+  const atlantiqueVisible = useMemo(() => (etiquetteMer && !theme ? positionMer(terresEurope, vue, largeur, hauteur, 'atlantique') : null), [etiquetteMer, theme, terresEurope, vue, largeur]);
   const defStyle = styleFond ? STYLES_FOND[styleFond] : null;
   // Style de fond : territoire plein (contour du style), voisins en simple trait ; sinon les traits habituels.
   const traitSelectionStyle = defStyle ? { ...TRAIT_SELECTION, fill: defStyle.territoire, fillOpacity: 1, stroke: defStyle.contour, strokeOpacity: 1, strokeWidth: defStyle.epaisseurContour ?? 1.6 } : null;
@@ -623,18 +626,18 @@ export default function CarteRendu({
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   };
   return (
-    <div className="cmap-cadre" style={{ height: HAUTEUR_CARTE * facteur, width: largeur * facteur, margin: '0 auto' }}>
+    <div className="cmap-cadre" style={{ height: hauteur * facteur, width: largeur * facteur, margin: '0 auto' }}>
       <div
         ref={carteRef}
         className={`cmap-rendu ${onClicCarte ? 'cmap-mode-ajout' : ''} ${theme ? `cmap-theme cmap-theme-${theme}` : ''} ${habillage === 'catalan' && !styleFond ? 'cmap-catalan' : ''} ${miniMaxiFrance ? 'cmap-minimaxi-france' : ''}`}
-        style={{ width: largeur, height: HAUTEUR_CARTE, transform: `scale(${facteur})` }}
+        style={{ width: largeur, height: hauteur, transform: `scale(${facteur})` }}
         onClick={(e) => {
           if (!onClicCarte || (e.target as HTMLElement).closest('.cmap-marqueur, .cmap-palette, .cmap-vent-ajoute')) return;
           const cadre = e.currentTarget.getBoundingClientRect();
           onClicCarte((e.clientX - cadre.left) / facteur, (e.clientY - cadre.top) / facteur);
         }}
       >
-        <svg className="cmap-svg" viewBox={`0 0 ${largeur} ${HAUTEUR_CARTE}`} width={largeur} height={HAUTEUR_CARTE}>
+        <svg className="cmap-svg" viewBox={`0 0 ${largeur} ${hauteur}`} width={largeur} height={hauteur}>
           <g transform={`translate(${vue.tx} ${vue.ty}) scale(${vue.echelle})`}>
             {/* Fond : relief NASA (couleurs recalées) ou photographies aériennes IGN. Léger chevauchement (+0,6) pour éviter
                 les joints entre tuiles. Filtre en attributs SVG (et en sRGB) pour qu'il passe dans l'export JPG. */}
@@ -651,11 +654,11 @@ export default function CarteRendu({
               </filter>
             )}
             <g filter={filtreFond ? `url(#${idFiltreFond})` : undefined}>
-              {!theme && !styleFond && tuilesVisibles(couche, vue, largeur, HAUTEUR_CARTE).map((t) => (
+              {!theme && !styleFond && tuilesVisibles(couche, vue, largeur, hauteur).map((t) => (
                 <TuileFond key={t.cle} t={t} couche={couche} />
               ))}
             </g>
-            {styleFond && <FondStyleSvg style={styleFond} vue={vue} largeur={largeur} hauteur={HAUTEUR_CARTE} terres={terresEurope} departements={departements} />}
+            {styleFond && <FondStyleSvg style={styleFond} vue={vue} largeur={largeur} hauteur={hauteur} terres={terresEurope} departements={departements} />}
             {departements.filter((c) => !selection.has(c.code)).map((c) => (
               <path key={c.code} d={c.d} {...(traitVoisinsStyle ?? (theme ? traitsTheme(theme).hors : TRAIT_HORS_SELECTION))} {...(regions ? { stroke: 'none' } : {})} />
             ))}
@@ -711,15 +714,15 @@ export default function CarteRendu({
             {regions?.map((c) => <path key={c.code} d={c.d} {...(theme ? traitsTheme(theme).region : TRAIT_REGION)} />)}
           </g>
         </svg>
-        {theme && <DecorTheme theme={theme} largeur={largeur} hauteur={HAUTEUR_CARTE} />}
-        {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={etiquetteMer ? null : merVisible} bandes={!sansBandes} />}
+        {theme && <DecorTheme theme={theme} largeur={largeur} hauteur={hauteur} />}
+        {styleFond && !theme && <DecorStyle style={styleFond} largeur={largeur} hauteur={hauteur} mer={etiquetteMer ? null : merVisible} bandes={!sansBandes} />}
 
         {/* Habillage catalan, carte locale : bandes de la senyera en haut à gauche (la date est à droite). */}
-        {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <BandesCoin largeur={largeur} hauteur={HAUTEUR_CARTE} />}
+        {habillage === 'catalan' && logoEnBas && !styleFond && !theme && <BandesCoin largeur={largeur} hauteur={hauteur} />}
 
-        {etiquetteMer && !theme && <DecorMer figee={mersFigees?.med ?? null} onPosition={(p) => onPositionMer?.('med', p)} onDeplacerFigee={(p) => onDeplacerMerFigee?.('med', p)} key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={moyennesGauche != null ? MER_FRANCE.mediterranee : merVisible ?? null} echelle={logoEnBas ? 1 : 0.85} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {etiquetteMer && !theme && <DecorMer figee={mersFigees?.med ?? null} onPosition={(p) => onPositionMer?.('med', p)} onDeplacerFigee={(p) => onDeplacerMerFigee?.('med', p)} key={`med-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={hauteur} mer={moyennesGauche != null ? MER_FRANCE.mediterranee : merVisible ?? null} echelle={logoEnBas ? 1 : 0.85} deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
         {/* Atlantique figé : affiché à sa place mémorisée même si le cadrage ne montre plus l'océan (comme la Méditerranée). */}
-        {(atlantiqueVisible || moyennesGauche != null || mersFigees?.atl) && etiquetteMer && !theme && <DecorMer figee={mersFigees?.atl ?? null} onPosition={(p) => onPositionMer?.('atl', p)} onDeplacerFigee={(p) => onDeplacerMerFigee?.('atl', p)} key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={HAUTEUR_CARTE} mer={moyennesGauche != null ? MER_FRANCE.atlantique : atlantiqueVisible ? { ...atlantiqueVisible, x: Math.max(75, atlantiqueVisible.x - 90) } : null} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
+        {(atlantiqueVisible || moyennesGauche != null || mersFigees?.atl) && etiquetteMer && !theme && <DecorMer figee={mersFigees?.atl ?? null} onPosition={(p) => onPositionMer?.('atl', p)} onDeplacerFigee={(p) => onDeplacerMerFigee?.('atl', p)} key={`atl-${vue.tx}-${vue.ty}-${vue.echelle}-${resetMers}`} largeur={largeur} hauteur={hauteur} mer={moyennesGauche != null ? MER_FRANCE.atlantique : atlantiqueVisible ? { ...atlantiqueVisible, x: Math.max(75, atlantiqueVisible.x - 90) } : null} atlantique deplacable={deplacerMers} couleur={defStyle?.texteMer ?? '#ffffff'} />}
 
         {logoUrl && (
           <img
@@ -806,7 +809,7 @@ export default function CarteRendu({
                 />
               </div>
               {directionOuvertePour === r.code && (
-                <div className="cmap-palette cmap-palette-direction cmap-sans-export" style={r.y > HAUTEUR_CARTE - 190 ? { bottom: 28, top: 'auto' } : { top: 28, bottom: 'auto' }}>
+                <div className="cmap-palette cmap-palette-direction cmap-sans-export" style={r.y > hauteur - 190 ? { bottom: 28, top: 'auto' } : { top: 28, bottom: 'auto' }}>
                   <div className="cmap-palette-separateur">Vent de</div>
                   <div className="cmap-rose">
                     {/* Rose des vents 3 × 3 : NO N NE / O · E / SO S SE. */}
