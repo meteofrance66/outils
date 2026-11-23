@@ -19,12 +19,16 @@ export default async function PageCartesInfo({ searchParams }: { searchParams: P
   return (
     <>
       <h1 className="text-3xl font-extrabold">Cartes infos météo</h1>
-      <p className="mt-2 max-w-3xl text-muted">
-        Toutes les cartes thématiques d&apos;un coup, pour la France, une région ou un département : prévisions des modèles (températures, pluie, rafales,
-        orages, neige, nuages, brouillard…), bilans des stations Météo-France (maximales, minimales, pluie, rafales, soleil, écarts à la normale)
-        et réchauffement climatique en 2050 et 2100 (chaleur, sécheresse, incendies, pluies extrêmes). Les cartes sont rangées par thème ; chacune
-        s&apos;exporte en JPG.
-      </p>
+      <div className="mt-2 space-y-1 text-sm text-muted">
+        <p>
+          Toutes les cartes thématiques d&apos;un coup, pour la France, une région ou un département : prévisions des modèles (températures, pluie,
+          rafales, orages, neige, nuages, brouillard…) et bilans des stations Météo-France (maximales, minimales, pluie, rafales, soleil, écarts à la normale).
+        </p>
+        <p>
+          Réchauffement climatique en 2050 et 2100 (chaleur, sécheresse, incendies, pluies extrêmes). Les cartes sont rangées par thème ; chacune
+          s&apos;exporte en JPG.
+        </p>
+      </div>
       <p className="mt-4 flex flex-wrap gap-2">
         <Link href="/outils/carte-meteo/" className="inline-block rounded-lg border border-border px-4 py-2 text-sm font-semibold">
           ← Carte météo avec pictos (modifiable)
