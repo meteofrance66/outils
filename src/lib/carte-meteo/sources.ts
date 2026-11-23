@@ -90,6 +90,8 @@ interface Extrait {
   montagne: Ville[];
   /** Communes de relief selon l'altitude minimale du point du modèle (300, 500 et 2 000 m ; 1 000 m : `montagne`). */
   montagneAlt?: Record<number, Ville[]>;
+  /** Communes dont le point du modèle est à 300, 500, 1 000 ou 2 000 m au plus (neige à basse altitude), la plus peuplée d'abord. */
+  bassesAlt?: Record<number, Ville[]>;
   /** Pluie de tous les points de grille du département (une série par point) : cumul de la commune la plus arrosée. */
   pluiePoints?: PluiePoints;
 }
@@ -174,7 +176,7 @@ const etatIndex = ((globalThis as { __etatIndexMeteo?: unknown }).__etatIndexMet
 }) as { enCours: Map<ModeleSource, Promise<string | null>>; echecs: Map<ModeleSource, number> };
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
-const VERSION_CACHE = 'v23'; // v23 : pluie de tous les points de grille du département (commune la plus arrosée) ; // v22 : après-midi = 15 h à 18 h, température moyenne ; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
+const VERSION_CACHE = 'v24'; // v24 : communes basses (relief « et moins », neige à basse altitude) ; // v23 : pluie de tous les points de grille du département (commune la plus arrosée) ; // v22 : après-midi = 15 h à 18 h, température moyenne ; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
 let purgeFaite = false;
 
 /** Supprime les extraits d'anciennes versions restés sur le disque (une seule fois par démarrage). */
@@ -465,6 +467,19 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
       altitude: Math.round(altitude(v.pointId) / 10) * 10,
     }));
   }
+  // Relief « et moins » (neige à basse altitude) : mêmes règles, avec une altitude maximale du point du modèle.
+  const bassesAlt: Record<number, typeof montagne> = {};
+  for (const seuil of [300, 500, 1000, 2000]) {
+    const moins = communes.filter((x) => altitude(x.pointId) <= seuil).slice(0, CANDIDATES_VILLES);
+    bassesAlt[seuil] = repartir(moins, VILLES_MONTAGNE_PAR_DEPARTEMENT).map((v) => ({
+      code: v.code,
+      nom: v.nom,
+      lat: v.lat,
+      lon: v.lon,
+      serie: serieDuPoint(fichier, c, v.pointId),
+      altitude: Math.round(altitude(v.pointId) / 10) * 10,
+    }));
+  }
   // Carte de France : la rafale du département est la plus forte de ses communes de plaine (point du modèle à 500 m au plus),
   // à chaque échéance, avec le vent et la direction de cette commune. Un seul point (Perpignan) est souvent plus abrité que la
   // plaine et la côte : la tramontane (65 km/h à Banyuls, 36 au point de Perpignan) n'apparaissait pas. Températures, ciel et
@@ -498,6 +513,7 @@ function extraire(dep: string, fichier: FichierDepartement, runTime: string): Ex
     villes,
     montagne,
     montagneAlt,
+    bassesAlt,
     ...(pluiePoints ? { pluiePoints } : {}),
   };
 }
@@ -885,7 +901,9 @@ export async function chargerPrevisionsMontagne(
   /** Altitude minimale du point du modèle (300, 500, 1 000 ou 2 000 m) ; 1 000 par défaut. */
   altitudeMin = 1000,
   /** Zonage fin : toutes les communes d'altitude retenues par département (jusqu'à 8), pas seulement la plus peuplée. */
-  toutesLesCommunes = false
+  toutesLesCommunes = false,
+  /** « moins » : communes dont le point du modèle est à cette altitude ou en dessous (neige à basse altitude), au lieu de « plus ». */
+  sens: 'plus' | 'moins' = 'plus'
 ): Promise<(PointCarte & { dep: string })[]> {
   const liste = deps ?? CODES_DEPARTEMENTS;
   // La moyenne des modèles n'existe qu'en vue département (villes) : la montagne prend alors AROME.
@@ -894,7 +912,7 @@ export async function chargerPrevisionsMontagne(
   const points: (PointCarte & { dep: string })[] = [];
   resultats.forEach((r, i) => {
     if (r.status === 'rejected') return;
-    const hautes = altitudeMin === 1000 ? r.value.montagne : r.value.montagneAlt?.[altitudeMin] ?? [];
+    const hautes = sens === 'moins' ? r.value.bassesAlt?.[altitudeMin] ?? [] : altitudeMin === 1000 ? r.value.montagne : r.value.montagneAlt?.[altitudeMin] ?? [];
     const villes = deps || toutesLesCommunes ? hautes : hautes.slice(0, 1);
     for (const v of villes) {
       const p = pointDepuisSerie(v.code, v.nom, v.serie, dateISO, finPeriode);

@@ -150,6 +150,8 @@ interface Props {
   contexte?: string;
   /** Mention discrète en bas à gauche de la carte (source de valeurs complémentaires). */
   mention?: string;
+  /** Altitude retenue (cartes de risque « Relief ») : « 300 m et moins », écrite dans la légende. */
+  legendeAltitude?: string;
   /** Texte d'alerte en gros caractères rouges sur la carte (ex. « ÉPISODE MÉDITERRANÉEN »). */
   bandeau?: string;
   /** Agrandissement du tableau « Les plus fortes » (1 = taille habituelle) et son habillage rouge, bien lisible. */
@@ -226,7 +228,7 @@ function titreEnMinuscules(titre: string): string {
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, modelePrevision, periodePrevision, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches, carre = false }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, modelePrevision, periodePrevision, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', legendeAltitude = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches, carre = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -513,7 +515,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   // Encadrés : France → classement à droite (mer au large de l'Alsace et des Alpes) et légende en bas à gauche (golfe de Gascogne) ;
   // régions et départements → les deux dans la colonne de gauche laissée libre par le cadrage.
 
-  const hauteurLegende = 30 + legende.length * 19 + (legendeNeige.length ? 30 + legendeNeige.length * 19 : 0);
+  const hauteurLegende = 30 + legende.length * 19 + (legendeNeige.length ? 30 + legendeNeige.length * 19 : 0) + (legendeAltitude ? 30 + 19 : 0);
   // Largeur du classement : rang + nom (17 caractères au plus) + département + valeur, en 13 px.
   const largeurTop0 = Math.max(
     LARGEUR_ENCADRE,
@@ -550,7 +552,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     ? { x: largeur - MARGE_COLONNE - largeurSeuils, y: rectTop.y + (hauteurTop ? hauteurTop + 10 : 0), w: largeurSeuils, h: hauteurSeuils }
     : { x: MARGE_COLONNE, y: rectTop.y + (hauteurTop ? hauteurTop + 10 : 0), w: largeurSeuils, h: hauteurSeuils };
   // Légende ajustée à son plus long libellé (pastille de couleur + texte en 13 px).
-  const largeurLegende = Math.max(118, Math.round(48 + Math.max(...legende.map((x) => x.libelle.length)) * 6.7));
+  const largeurLegende = Math.max(118, Math.round(48 + Math.max(...legende.map((x) => x.libelle.length), legendeAltitude.length) * 6.7));
   const rectLegende: Rect = { x: MARGE_COLONNE, y: hauteurCarte - 44 - hauteurLegende, w: largeurLegende, h: hauteurLegende };
 
   // Texte IA (à la demande) : posé en bas, à droite de la légende.
@@ -1068,6 +1070,16 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
                     {x.libelle}
                   </li>
                 ))}
+              </ul>
+            </>
+          )}
+          {legendeAltitude && (
+            <>
+              <div className="cinfo-encadre-titre" style={{ marginTop: 8 }}>
+                Altitude
+              </div>
+              <ul>
+                <li>{legendeAltitude}</li>
               </ul>
             </>
           )}

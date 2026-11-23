@@ -280,7 +280,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const [tailleValeurs, setTailleValeurs] = useState(uneCarte ? 160 : 130);
   /** Grosseur de la police du tableau (classement) : 100 = taille habituelle. */
   const [tailleTableau, setTailleTableau] = useState(100);
-  const [sansTableau, setSansTableau] = useState(false);
+  // Cartes d'alertes (?cartes=alertes) : sans tableau du classement par défaut (le visiteur peut le réafficher).
+  const [sansTableau, setSansTableau] = useState(modeInitial === 'alertes');
   /** Cartes de risque : afficher les chiffres (km/h, mm, °C) à la place des niveaux (faible, modéré…). */
   const [chiffres, setChiffres] = useState(false);
   /** Cartes de risque : durée choisie (par défaut une période) ; la liste ne garde qu'une entrée par risque, la durée se change dans le menu « Durée du risque ». */
@@ -295,7 +296,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
         : // Cartes infos : « jusqu'à la fin du run » toujours pour AROME et Harmonie, chacun jusqu'au bout de son échéance (plus la carte du modèle choisi s'il est autre).
           THEMES_PREVISION.flatMap((t) => (t.run ? [...variantesRun(t), ...(modele === 'arome' || modele === 'harmonie' || modele === 'moyenne' ? [] : [t])] : [t]))
       ).map((t) => {
-        let r: ThemePrevision = (chiffres || (affichage.styleCarte === 'pluie-pro' && t.id.startsWith('risque-pluie'))) && t.brut ? { ...t, ...t.brut, texteValeur: undefined, neutresVisibles: true } : t;
+        // Cartes de risque en chiffres : pas de « 0 cm » (ni 0 km/h, 0 mm…) sur la carte, la zone sans risque est seulement coloriée en gris.
+        let r: ThemePrevision = (chiffres || (affichage.styleCarte === 'pluie-pro' && t.id.startsWith('risque-pluie'))) && t.brut ? { ...t, ...t.brut, texteValeur: undefined, neutresVisibles: t.groupe !== 'Risques' } : t;
         // Relief : les cartes de risque lisent les communes d'altitude (requête « montagne » avec l'altitude minimale choisie).
         if (reliefAlt > 0 && t.groupe === 'Risques') r = { ...r, montagne: true };
         return r;
@@ -372,8 +374,12 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const cleRun = (m: string) => `${m}|${aujourdhui}|${requeteZone}`;
   const modeleCumul = modeleDuCumul(modele);
   const cleCumul = `${modeleCumul}|${aujourdhui}|${requeteZone}`;
+  // Danger « Neige » : le menu Relief compte les communes « à X m et moins » (neige à basse altitude), pas « et plus » comme les autres dangers.
+  const reliefMoins = mode === 'prevision' && groupeChoisi === GROUPE_RISQUES && dangerChoisi === 'risque-neige';
+  const sensRelief: 'plus' | 'moins' = reliefMoins && reliefAlt > 0 ? 'moins' : 'plus';
+  const parametreSens = sensRelief === 'moins' ? '&sens=moins' : '';
   // Montagne : même modèle et même jour que les autres cartes, points au-dessus de 1 000 m.
-  const cleMontagne = `${modele}|${dateISO}|${requeteZone}|montagne|${reliefAlt || 1000}`;
+  const cleMontagne = `${modele}|${dateISO}|${requeteZone}|montagne|${reliefAlt || 1000}|${sensRelief}`;
   // Période de pluie ramenée à l'échéance du modèle choisi (AROME : 2 jours, CEP : 15 jours).
   const jourMax = echeanceDe(modele);
   const jourMaxPeriode = echeancePeriodeDe(modele);
@@ -382,7 +388,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const debutPeriodeISO = ajouterJours(aujourdhui, debutPeriode);
   const finPeriodeISO = ajouterJours(aujourdhui, finPeriode);
   const clePeriode = `${modele}|${debutPeriodeISO}|${finPeriodeISO}|${requeteZone}|periode`;
-  const cleMontagnePeriode = `${clePeriode}|montagne|${reliefAlt || 1000}`;
+  const cleMontagnePeriode = `${clePeriode}|montagne|${reliefAlt || 1000}|${sensRelief}`;
   // Une erreur ne bloque que la requête qui l’a produite.
   const erreurPeriode = echecPeriode?.cle === clePeriode ? echecPeriode.message : null;
   const erreurMontagnePeriode = echecMontagnePeriode?.cle === cleMontagnePeriode ? echecMontagnePeriode.message : null;
@@ -447,7 +453,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   useEffect(() => {
     if (bloque || !groupesAvecMontagnePeriode || montagnePeriode?.cle === cleMontagnePeriode || erreurMontagnePeriode) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${debutPeriodeISO}&fin=${finPeriodeISO}${requeteZone}&montagne=1${reliefAlt ? `&alt=${reliefAlt}` : ''}`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${debutPeriodeISO}&fin=${finPeriodeISO}${requeteZone}&montagne=1${reliefAlt ? `&alt=${reliefAlt}` : ''}${parametreSens}`, { signal: controleur.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
         return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
@@ -462,7 +468,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   useEffect(() => {
     if (bloque || !groupesAvecMontagne || montagne?.cle === cleMontagne || erreurMontagne) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${dateISO}${requeteZone}&montagne=1${reliefAlt ? `&alt=${reliefAlt}` : ''}`, { signal: controleur.signal })
+    fetch(`/api/carte-meteo/previsions/?modele=${paramModele(modele)}&date=${dateISO}${requeteZone}&montagne=1${reliefAlt ? `&alt=${reliefAlt}` : ''}${parametreSens}`, { signal: controleur.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
         return r.json() as Promise<{ points: (PointCarte & { dep?: string })[] }>;
@@ -708,7 +714,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
             ? { ...g, themes: [
                 ...g.themes.filter((t) => dangerDe(t.id) === dangerChoisi && (!alerteParJour || (!(t as ThemePrevision).periode && !(t as ThemePrevision).fenetreHeures))),
                 // Neige en montagne (groupe Montagne) : rangée ici avec le danger « Neige ».
-                ...(neigeRisquesMontagne ? themesPrevision.filter((t) => (t.id === 'neige-montagne' || t.id === 'neige-montagne-periode') && (!alerteParJour || !t.periode)) : []),
+                ...(neigeRisquesMontagne && sensRelief !== 'moins' ? themesPrevision.filter((t) => (t.id === 'neige-montagne' || t.id === 'neige-montagne-periode') && (!alerteParJour || !t.periode)) : []),
               ] }
             : g;
         });
@@ -868,6 +874,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
         prendre<string>('dangerChoisi', setDangerChoisi);
         prendre<ModeleMeteo>('modele', setModele);
         prendre<number>('jour', setJour);
+        prendre<boolean>('sansTableau', setSansTableau);
         prendre<'jour' | 'periode' | '24h'>('dureeRisque', setDureeRisque);
         prendre<Horizon>('horizon', setHorizon);
         if (!alertesDemandees) {
@@ -885,11 +892,11 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     // Rien n'est écrit avant la lecture : sinon les valeurs par défaut écraseraient les choix gardés.
     if (uneCarte || !selectionLue) return;
     try {
-      sessionStorage.setItem(cleSelection, JSON.stringify({ mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, dureeRisque, horizon, chiffres, zonageFin }));
+      sessionStorage.setItem(cleSelection, JSON.stringify({ mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, sansTableau, dureeRisque, horizon, chiffres, zonageFin }));
     } catch {
       // Stockage bloqué (navigation privée) : les choix restent valables tant que la page est ouverte.
     }
-  }, [uneCarte, selectionLue, cleSelection, mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, dureeRisque, horizon, chiffres, zonageFin]);
+  }, [uneCarte, selectionLue, cleSelection, mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, sansTableau, dureeRisque, horizon, chiffres, zonageFin]);
   /** La carte affichée a toutes ses données : seule une carte complète peut être figée. */
   const peutFiger = uneCarte && !chargement && !erreurAffichee && (mode !== 'prevision' || (!!carteEffective && !!pointsPrevision[carteEffective.id]));
   /** Instant où la carte a été figée : « Carte élaborée le » et les fenêtres « depuis maintenant » le gardent au lieu de suivre l'horloge. */
@@ -1416,10 +1423,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               <span className={`${legende} !text-red-600`}>Relief (altitude)</span>
               <select value={reliefAlt} onChange={(e) => setReliefAlt(Number(e.target.value) as 0 | 300 | 500 | 1000 | 2000)} className={`${selectBarre} !border-red-600 font-semibold ${uneCarte ? 'w-full' : ''}`}>
                 <option value={0}>Plaine et villes (par défaut)</option>
-                <option value={300}>Relief : communes à 300 m et plus</option>
-                <option value={500}>Relief : communes à 500 m et plus</option>
-                <option value={1000}>Relief : communes à 1 000 m et plus</option>
-                <option value={2000}>Relief : communes à 2 000 m et plus</option>
+                <option value={300}>Relief : communes à 300 m et {reliefMoins ? 'moins' : 'plus'}</option>
+                <option value={500}>Relief : communes à 500 m et {reliefMoins ? 'moins' : 'plus'}</option>
+                <option value={1000}>Relief : communes à 1 000 m et {reliefMoins ? 'moins' : 'plus'}</option>
+                <option value={2000}>Relief : communes à 2 000 m et {reliefMoins ? 'moins' : 'plus'}</option>
               </select>
             </label>
           )}
@@ -1743,17 +1750,18 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                             ? infoRun(theme as ThemePrevision).sousTitreRun!.modele
                             : (theme as ThemePrevision).periode
                             ? (theme as ThemePrevision).montagne
-                              ? `${sousTitrePeriode} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET PLUS`
+                              ? `${sousTitrePeriode} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET ${sensRelief === 'moins' ? 'MOINS' : 'PLUS'}`
                               : theme.id === 'risque-froid-periode' ? `NUIT ${sousTitrePeriode}` : sousTitrePeriode
                             : (theme as ThemePrevision).montagne
-                              ? `${libelleJour(dateISO)} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET PLUS`
+                              ? `${libelleJour(dateISO)} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET ${sensRelief === 'moins' ? 'MOINS' : 'PLUS'}`
                               : libelleJour(dateISO)) +
                           // Carte de risque sans aucune zone concernée : on l'écrit, plutôt que de laisser une carte qui paraît vide.
                           (theme.groupe === GROUPE_RISQUES && (pointsPrevision[theme.id] ?? []).length > 0 && (pointsPrevision[theme.id] ?? []).every((q) => q.valeur === 0) ? ' · AUCUN RISQUE PRÉVU' : '')
                         }
                         logoId={logoId}
                         prefixeFichier={prefixe}
-                        contexte={(theme as ThemePrevision).montagne ? `${infoRun(theme as ThemePrevision).contexte}, communes de montagne (point du modèle à ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} m ou plus)` : infoRun(theme as ThemePrevision).contexte}
+                        contexte={(theme as ThemePrevision).montagne ? `${infoRun(theme as ThemePrevision).contexte}, communes de montagne (point du modèle à ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} m ou ${sensRelief === 'moins' ? 'moins' : 'plus'})` : infoRun(theme as ThemePrevision).contexte}
+                        legendeAltitude={theme.groupe === GROUPE_RISQUES && reliefAlt ? `${reliefAlt.toLocaleString('fr-FR')} m et ${sensRelief === 'moins' ? 'moins' : 'plus'}` : ''}
                       />
                     ) : mode === 'bilan' ? (
                       <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} {...retouchesDe(theme.id)} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
