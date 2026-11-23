@@ -810,7 +810,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         if (e.name === 'AbortError') return;
         // AROME (18 h) et Harmonie (60 h) n'ont pas toujours le jour demandé : on passe au modèle suivant, puis au CEP.
         const suivant = SECOURS[modele];
-        if (e.message.startsWith('Pas de prévision') && suivant) {
+        // Harmonie DMI 2 km choisi à la main : pas de repli silencieux sur AROME, on le dit.
+        if (e.message.startsWith('Pas de prévision') && modele === 'harmonie2km' && modeleTouche) setErreur('Harmonie DMI 2 km ne couvre pas ce jour : choisissez AROME ou un autre jour.');
+        else if (e.message.startsWith('Pas de prévision') && suivant) {
           setModele(suivant);
           // Le modèle par défaut (Harmonie 2 km aujourd'hui sur le 66) ne doit pas être reproposé aussitôt.
           setModeleTouche(true);
@@ -839,7 +841,9 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         if (e.name === 'AbortError') return;
         // AROME (18 h) et Harmonie (60 h) n'ont pas toujours le jour demandé : on passe au modèle suivant, puis au CEP.
         const suivant = SECOURS[modele];
-        if (e.message.startsWith('Pas de prévision') && suivant) {
+        // Harmonie DMI 2 km choisi à la main : pas de repli silencieux sur AROME, on le dit.
+        if (e.message.startsWith('Pas de prévision') && modele === 'harmonie2km' && modeleTouche) setErreur('Harmonie DMI 2 km ne couvre pas ce jour : choisissez AROME ou un autre jour.');
+        else if (e.message.startsWith('Pas de prévision') && suivant) {
           setModele(suivant);
           // Le modèle par défaut (Harmonie 2 km aujourd'hui sur le 66) ne doit pas être reproposé aussitôt.
           setModeleTouche(true);
