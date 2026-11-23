@@ -319,7 +319,7 @@ const PALIERS_ECART: Palier[] = [
 ];
 
 const PALIERS_NEIGE_SOL: Palier[] = PALIERS_NEIGE.map((x) => (x.neutre ? { ...x, libelle: 'Pas de neige au sol' } : x));
-/** Montagne : « 0 cm » s'affiche aussi (où il n'y a pas encore de neige), en gris (thèmes avec neutresVisibles). */
+/** Montagne : les zones sans neige sont coloriées en gris, sans « 0 cm » écrit (sauf neige au sol en montagne, qui garde neutresVisibles). */
 const PALIERS_NEIGE_MONTAGNE: Palier[] = PALIERS_NEIGE.map((x) => (x.neutre ? { ...x, fond: '#94a3b8', libelle: 'Pas de neige' } : x));
 
 /** Variation de la température sur 24 heures. */
@@ -516,8 +516,8 @@ const THEMES_PREVISION_BASE: ThemePrevision[] = [
   { id: 'risque-verglas-24h', groupe: 'Risques', fenetreHeures: 24, titre: 'RISQUE DE VERGLAS DANS LES 24 PROCHAINES HEURES', court: 'Risque de verglas sur 24 h (indicatif)', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: niveauVerglas24h, texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'neige', groupe: 'Orages et neige', titre: 'NEIGE FRAÎCHE', court: 'Neige', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE, ordre: 'desc', titreTop: 'Les plus enneigés', valeur: (x) => x.neigeJournee },
   { id: 'neige-periode', groupe: 'Orages et neige', periode: true, titre: 'NEIGE FRAÎCHE SUR LA PÉRIODE', court: 'Neige sur une période', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE, ordre: 'desc', titreTop: 'Les plus enneigés', valeur: (x) => x.neigePeriode },
-  { id: 'neige-montagne', groupe: 'Montagne', montagne: true, neutresVisibles: true, titre: 'NEIGE FRAÎCHE EN MONTAGNE', court: 'Neige en montagne', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_MONTAGNE, ordre: 'desc', titreTop: 'Les plus enneigées', valeur: (x) => x.neigeJournee },
-  { id: 'neige-montagne-periode', groupe: 'Montagne', montagne: true, periode: true, neutresVisibles: true, titre: 'NEIGE FRAÎCHE EN MONTAGNE SUR LA PÉRIODE', court: 'Neige en montagne sur une période', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_MONTAGNE, ordre: 'desc', titreTop: 'Les plus enneigées', valeur: (x) => x.neigePeriode },
+  { id: 'neige-montagne', groupe: 'Montagne', montagne: true, titre: 'NEIGE FRAÎCHE EN MONTAGNE', court: 'Neige en montagne', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_MONTAGNE, ordre: 'desc', titreTop: 'Les plus enneigées', valeur: (x) => x.neigeJournee },
+  { id: 'neige-montagne-periode', groupe: 'Montagne', montagne: true, periode: true, titre: 'NEIGE FRAÎCHE EN MONTAGNE SUR LA PÉRIODE', court: 'Neige en montagne sur une période', unite: 'cm', decimales: 0, paliers: PALIERS_NEIGE_MONTAGNE, ordre: 'desc', titreTop: 'Les plus enneigées', valeur: (x) => x.neigePeriode },
   { id: 'tmax-montagne', groupe: 'Montagne', montagne: true, titre: 'MAXIMALES EN MONTAGNE', court: 'Maxi en montagne', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus douces', valeur: (x) => x.maxi },
   { id: 'nuages', groupe: 'Ciel et brouillard', titre: 'COUVERTURE NUAGEUSE', court: 'Nuages et soleil', unite: '%', decimales: 0, paliers: PALIERS_NUAGES, ordre: 'asc', titreTop: 'Les plus ensoleillés', valeur: (x) => x.nuagesJournee },
   { id: 'brouillard', groupe: 'Ciel et brouillard', titre: 'BROUILLARD ET VISIBILITÉ', court: 'Brouillard', unite: 'km', decimales: 1, paliers: PALIERS_VISIBILITE, ordre: 'asc', titreTop: 'Visibilité la plus faible', valeur: (x) => x.visibiliteMin },
