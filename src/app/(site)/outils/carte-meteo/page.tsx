@@ -37,7 +37,7 @@ export default async function PageCarteMeteo() {
   return (
     <>
       <h1 className="text-3xl font-extrabold">Carte météo France du jour</h1>
-      <p className="mt-2 max-w-2xl text-muted">
+      <p className="mt-2 text-muted sm:whitespace-nowrap">
         Températures de l&apos;après-midi et rafales de vent, par région ou département. Pictos et valeurs modifiables avant export en JPG.
       </p>
       <div className="mt-6">
