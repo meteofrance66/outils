@@ -19,7 +19,11 @@ const STATIONS_T = [
   { code: '146', nom: 'Cabestany', dep: '66', lat: 42.686, lon: 2.937, alt: 30 },
 ];
 /** Stations du classement des rafales sans point sur la carte (aucune station Météo-France du même nom) : position de la commune. */
-const STATIONS_RAFALES = [{ nom: 'Cerbère', dep: '66', lat: 42.4433, lon: 3.1647, alt: 20 }];
+const STATIONS_RAFALES = [
+  { nom: 'Cerbère', dep: '66', lat: 42.4433, lon: 3.1647, alt: 20 },
+  // Porto-Vecchio : pas de station de relevés du même nom ; position de la commune.
+  { nom: 'Porto-Vecchio', dep: '2A', lat: 41.5912, lon: 9.2795, alt: 20 },
+];
 
 export interface ReponseComplements {
   /** Clé « NOM|dép. » (nom normalisé) → valeur. */
@@ -80,6 +84,8 @@ export async function GET() {
       return t ? [{ nom: s.nom, dep: s.dep, lat: s.lat, lon: s.lon, alt: s.alt, valeur: t.valeur, heure: t.heure }] : [];
     });
     const rafales24 = lireClassement(rafales);
+    // Même station, deux noms : « Ajaccio La Parata » dans le classement, « Ajaccio-Parata » dans les relevés.
+    if (rafales24['AJACCIO LA PARATA|2A'] != null) rafales24['AJACCIO PARATA|2A'] = rafales24['AJACCIO LA PARATA|2A'];
     const rafales24Ajouts = STATIONS_RAFALES.flatMap((s) => {
       const valeur = rafales24[`${normaliser(s.nom)}|${s.dep}`];
       return valeur == null ? [] : [{ ...s, valeur }];

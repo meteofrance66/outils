@@ -88,7 +88,9 @@ export default function ObservationsDirect() {
           for (const s of complements.temperatures) ajoutes.push({ code: `mc:${s.nom}`, nom: s.nom, dep: s.dep, lat: s.lat, lon: s.lon, alt: s.alt, valeur: s.valeur });
         }
       }
-      const toutes = [...liste, ...ajoutes];
+      // Rafales : le classement Météo-Ciel (rafales sur 24 h) remplace la valeur du relevé quand il en a une pour la même station.
+      const corrigees = complements && t.id === 'obs-raf24' ? liste.map((p) => ({ ...p, valeur: complements.rafales24[`${normaliserNom(p.nom)}|${p.dep}`] ?? p.valeur })) : liste;
+      const toutes = [...corrigees, ...ajoutes];
       resultat[t.id] = t.obs?.controle ? sansValeursAberrantes(toutes) : toutes;
       nbAjoutes[t.id] = ajoutes.filter((a) => resultat[t.id].includes(a)).length;
     }
@@ -194,12 +196,12 @@ export default function ObservationsDirect() {
         </label>
         {bilans && (
           <div className="text-sm">
-            <button type="button" onClick={importer} disabled={import_.etat === 'attente'} className="rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold disabled:opacity-60" title="Complète les rafales et pluies sur 24 h, et les températures de Perpignan - El Vernet et Cabestany">
+            <button type="button" onClick={importer} disabled={import_.etat === 'attente'} className="rounded-lg border border-border bg-surface px-3 py-1.5 font-semibold disabled:opacity-60" title="Ajoute les rafales sur 24 h manquantes, met à jour les rafales d'après le classement Météo-Ciel, et ajoute les températures de Perpignan - El Vernet et Cabestany">
               {import_.etat === 'attente' ? 'Import en cours…' : 'Importer les valeurs manquantes'}
             </button>
             {complements && import_.etat === 'ok' && (
               <span className="ml-2 text-muted">
-                {Object.values(pointsEtAjouts.nbAjoutes).reduce((a, b) => a + b, 0)} valeur(s) ajoutée(s) (rafales et pluie sur 24 h, températures).
+                {Object.values(pointsEtAjouts.nbAjoutes).reduce((a, b) => a + b, 0)} valeur(s) ajoutée(s) (rafales sur 24 h et températures) ; rafales sur 24 h mises à jour d&apos;après le classement Météo-Ciel.
               </span>
             )}
             {import_.etat === 'erreur' && <span className="ml-2 text-danger">Import momentanément indisponible.</span>}
