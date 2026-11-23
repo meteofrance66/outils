@@ -83,6 +83,11 @@ export async function GET(req: Request) {
   }
 
   try {
+    // Moyenne des modèles pour la France entière (un point par département) : moyenne des modèles qui couvrent le jour.
+    if (modele === 'moyenne' && !dep && !deps) {
+      const { points, modeles } = await moyenneCarte(date, fin);
+      return NextResponse.json({ modele, date, dep, points, modeles }, { headers: { 'Cache-Control': 'public, max-age=300' } });
+    }
     const points = !dep && !deps && modele !== 'moyenne' && url.searchParams.get('zones') === '9' ? await chargerPrevisionsZones(modele, date, fin) : dep ? await chargerPrevisionsVilles(modele, date, dep, fin) : await chargerPrevisionsCarte(modele, date, fin);
     return NextResponse.json({ modele, date, dep, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {

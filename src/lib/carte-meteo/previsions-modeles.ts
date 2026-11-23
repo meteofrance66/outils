@@ -28,8 +28,8 @@ export const MODELES_MOYENNE_FRANCE: ModeleSource[] = ['arome', 'harmonie', 'arp
 export const MODELES_MOYENNE: ModeleSource[] = ['arome', 'harmonie2km', 'harmonie', 'arpege', 'cep', 'gfs', 'aromeifs', 'arpege025', 'icon', 'ukmo', 'iconeu', 'wrf', 'aifs'];
 
 export const MODELES: { id: ModeleMeteo; libelle: string; fournisseur: string; departements?: string[]; vueDepartement?: boolean }[] = [
-  // Températures moyennées sur les modèles disponibles ; pictos, nuages et vent d'AROME. Vue département seulement.
-  { id: 'moyenne', libelle: 'Moyenne des modèles', fournisseur: 'AROME, Harmonie, ARPEGE, CEP, GFS, AROME-IFS, ICON, UKMO, AIFS…', vueDepartement: true },
+  // Moyenne des modèles qui couvrent le jour, pour la France, une région ou un département (valeurs moyennées point par point).
+  { id: 'moyenne', libelle: 'Moyenne des modèles', fournisseur: 'AROME, Harmonie, ARPEGE, CEP, GFS, AROME-IFS, ICON, UKMO, AIFS…' },
   { id: 'arome', libelle: 'AROME', fournisseur: 'Météo-France' },
   // HARMONIE DINI du DMI à 2 km, publié pour les Pyrénées-Orientales seulement (dépôt harmonie-dmi-2km).
   { id: 'harmonie2km', libelle: 'Harmonie DMI 2 km', fournisseur: 'Danemark, Pyrénées-Orientales', departements: ['66'] },
