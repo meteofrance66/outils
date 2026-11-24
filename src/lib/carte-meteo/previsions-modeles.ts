@@ -610,7 +610,7 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     codeMatin: codePeriode(serie, matin),
     nuagesMatin: arrondi(moyenne(matin.map((i) => serie.nuages[i]))),
     pluieMatin: arrondi(somme(matin.map((i) => serie.pluie[i])), 1),
-    tempApresMidi: arrondi(maximum(chaleurApresMidi.map((i) => serie.temp[i])), 0),
+    tempApresMidi: arrondi(maximum(chaleurApresMidi.map((i) => serie.temp[i])), 1),
     rafaleApresMidi: arrondi(maximum(apresMidi.map((i) => serie.rafale[i]))),
     rafaleJournee: arrondi(maximum(toute.map((i) => serie.rafale[i]))),
     directionRafaleApresMidi: directionRafaleMax(serie, apresMidi),
