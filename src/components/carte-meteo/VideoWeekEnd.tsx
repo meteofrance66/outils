@@ -2544,21 +2544,6 @@ export default function VideoWeekEnd({
             className={selectBarre}
           />
         </label>
-        <label className="text-sm font-medium">
-          <span className={legende}>Sous-titres automatiques (facultatif)</span>
-          <textarea
-            value={soustitresTexte}
-            onChange={(e) => setSoustitresTexte(e.target.value)}
-            rows={3}
-            placeholder={'Collez le texte que vous dites à voix haute : il défile mot à mot en bas de l\'écran, le mot dit en jaune, réparti sur toute la vidéo.'}
-            className={selectBarre}
-          />
-          {soustitres.length > 0 && total > 0 && !voixValide && (
-            <span className="block text-xs text-muted">
-              {soustitres.length} mots sur {Math.round(total)} s, soit {(soustitres.length / total).toFixed(1).replace('.', ',')} mot/s (une voix naturelle : 2 à 3 mots/s).
-            </span>
-          )}
-        </label>
         {(
           <div className="grid gap-2 rounded-lg border border-border p-3 text-sm">
             <span className="font-medium">🎙️ Voix de synthèse (Azure) pour ce texte</span>
@@ -2580,7 +2565,7 @@ export default function VideoWeekEnd({
             <button type="button" onClick={genererVoix} disabled={voixEnCours || soustitres.length === 0} className="rounded-lg border border-border bg-surface px-3 py-2 font-medium hover:border-primary disabled:opacity-60">
               {voixEnCours ? 'Génération de la voix…' : voixValide ? '🔄 Régénérer la voix' : '🎙️ Générer la voix'}
             </button>
-            {soustitres.length === 0 && <span className="text-xs text-muted">Écris ou colle d’abord le texte à dire dans « Sous-titres automatiques » ci-dessus.</span>}
+            {soustitres.length === 0 && <span className="text-xs text-muted">Écris ou colle d’abord le texte à dire dans « Sous-titres automatiques », sous la vidéo.</span>}
             {voixErreur && <span className="text-xs text-red-600">{voixErreur}</span>}
             {voixValide && (
               <>
@@ -2675,6 +2660,22 @@ export default function VideoWeekEnd({
           )}
         </div>
         )}
+        {/* Sous la vidéo et sous le texte du post : grande zone pour écrire ou coller le texte parlé. */}
+        <label className="w-full text-sm font-medium" style={{ maxWidth: format.h > format.l ? '26rem' : format.l > format.h ? '46rem' : '32rem' }}>
+          <span className={legende}>Sous-titres automatiques (facultatif)</span>
+          <textarea
+            value={soustitresTexte}
+            onChange={(e) => setSoustitresTexte(e.target.value)}
+            rows={14}
+            placeholder={'Collez le texte que vous dites à voix haute : il défile mot à mot en bas de l\'écran, le mot dit en jaune, réparti sur toute la vidéo.'}
+            className="min-h-[16rem] w-full resize-y rounded-lg border border-border bg-surface p-3 text-base leading-relaxed"
+          />
+          {soustitres.length > 0 && total > 0 && !voixValide && (
+            <span className="block text-xs text-muted">
+              {soustitres.length} mots sur {Math.round(total)} s, soit {(soustitres.length / total).toFixed(1).replace('.', ',')} mot/s (une voix naturelle : 2 à 3 mots/s).
+            </span>
+          )}
+        </label>
         {!contexte && !erreur && <p className="text-sm text-muted">{genre === 'tendance' ? 'Chargement des prévisions des 12 jours…' : 'Chargement des villes et des prévisions…'}</p>}
       </div>
     </div>

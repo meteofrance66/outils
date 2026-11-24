@@ -124,9 +124,10 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
 
   const suffixe = classement === 'liste' || !theme ? '' : sens === theme.ordre && theme.titreTop ? theme.titreTop.toUpperCase() : sens === 'asc' ? 'LES PLUS BAS' : 'LES PLUS ÉLEVÉS';
   // Minimales de la nuit : plus « provisoires » à partir de 8 h (heure de Paris) ; lu après l'affichage pour éviter un décalage serveur / navigateur.
-  const [nuitFinie, setNuitFinie] = useState(false);
-  useEffect(() => setNuitFinie(nuitTerminee()), []);
-  const titreAuto = theme ? `${modele.titre ?? titreCarte(theme, nuitFinie)}${suffixe ? ` : ${suffixe}` : ''}` : '';
+  const [maintenant, setMaintenant] = useState<number | null>(null);
+  useEffect(() => setMaintenant(Date.now()), []);
+  const nuitFinie = maintenant != null && nuitTerminee(maintenant);
+  const titreAuto = theme ? `${modele.titre ?? titreCarte(theme, maintenant)}${suffixe ? ` : ${suffixe}` : ''}` : '';
   const sousTitreAuto = [modele.periode(aujourdhui, nuitFinie), lieu.toUpperCase()].filter(Boolean).join(' · ');
   const titre = titreSaisi ?? titreAuto;
   const sousTitre = sousTitreSaisi ?? sousTitreAuto;

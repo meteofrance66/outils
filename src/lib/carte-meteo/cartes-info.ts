@@ -586,6 +586,7 @@ export const THEMES_BILAN: ThemeBilan[] = [
   // Maxi et mini de la journée (page des températures en direct) : toutes les stations, une carte à boutons.
   { id: 'tx-jour-direct', groupe: GROUPE_JOURNEE, classement: 'tx-prov', toutes: true, sansTeinte: true, titre: 'MAXIMALES DU JOUR (PROVISOIRES)', court: 'Maxi du jour', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-jour-direct', groupe: GROUPE_JOURNEE, classement: 'tn-prov', toutes: true, sansTeinte: true, titre: 'MINIMALES DE LA NUIT (PROVISOIRES)', court: 'Mini de la nuit', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
+  { id: 'tn-matin-direct', groupe: GROUPE_JOURNEE, classement: 'tn-matin', toutes: true, sansTeinte: true, titre: 'MINIMALES DE CE MATIN (PROVISOIRES)', court: 'Mini de ce matin (5 h → 10 h)', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 'tx-veille-direct', groupe: GROUPE_JOURNEE, classement: 'tx-fin', toutes: true, sansTeinte: true, titre: 'MAXIMALES D’HIER', court: 'Maxi d’hier', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
   { id: 'tn-veille-direct', groupe: GROUPE_JOURNEE, classement: 'tn-fin', toutes: true, sansTeinte: true, titre: 'MINIMALES DE LA NUIT DERNIÈRE', court: 'Mini de la nuit dernière', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froides' },
   { id: 't-direct', groupe: GROUPE_DIRECT, classement: 't', direct: { vue: 'releve' }, toutes: true, sansTeinte: true, titre: 'TEMPÉRATURES DU MOMENT', court: 'Relevés', unite: '°', decimales: 1, paliers: PALIERS_TEMPERATURE, ordre: 'desc', titreTop: 'Les plus chaudes' },
@@ -785,15 +786,29 @@ export function valeurPlausible(theme: ThemeInfo, v: number): boolean {
 
 export const palierDe = (paliers: Palier[], v: number): Palier => paliers.find((x) => v >= x.min) ?? paliers[paliers.length - 1];
 
+const heureParis = (maintenant: number) => Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Paris' }).format(maintenant));
+
 /** Nuit (20 h → 8 h, heure de Paris) terminée : de 8 h à 20 h, la minimale de la nuit est définitive, plus provisoire. */
 export function nuitTerminee(maintenant = Date.now()): boolean {
-  const heure = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Paris' }).format(maintenant));
+  const heure = heureParis(maintenant);
   return heure >= 8 && heure < 20;
 }
 
-/** Titre d'une carte : « MINIMALES DE LA NUIT (PROVISOIRES) » perd « (PROVISOIRES) » une fois la nuit terminée (8 h passées). */
-export const titreCarte = (theme: Pick<ThemeInfo, 'id' | 'titre'>, nuitFinie: boolean): string =>
-  nuitFinie && (theme.id === 'tn-prov' || theme.id === 'tn-jour-direct') ? theme.titre.replace(/ \(PROVISOIRES\)$/, '') : theme.titre;
+/** Matin (5 h → 10 h, heure de Paris) terminé : provisoire seulement de 5 h à 10 h ; avant 5 h, c'est le matin d'hier, déjà complet. */
+export function matinTermine(maintenant = Date.now()): boolean {
+  const heure = heureParis(maintenant);
+  return !(heure >= 5 && heure < 10);
+}
+
+/**
+ * Titre d'une carte : « MINIMALES DE LA NUIT (PROVISOIRES) » perd « (PROVISOIRES) » à 8 h (nuit terminée), « MINIMALES DE CE MATIN
+ * (PROVISOIRES) » à 10 h. `maintenant` : instant (ms) ; null tant qu'il n'est pas lu côté navigateur (titre d'origine).
+ */
+export function titreCarte(theme: Pick<ThemeInfo, 'id' | 'titre'>, maintenant: number | null): string {
+  if (maintenant == null) return theme.titre;
+  const fini = theme.id === 'tn-prov' || theme.id === 'tn-jour-direct' ? nuitTerminee(maintenant) : theme.id === 'tn-matin-direct' ? matinTermine(maintenant) : false;
+  return fini ? theme.titre.replace(/ \(PROVISOIRES\)$/, '') : theme.titre;
+}
 
 /** Texte d'une valeur : arrondi, signe, unité courte (le degré est collé au nombre). */
 export function texteInfo(theme: ThemeInfo, v: number): string {

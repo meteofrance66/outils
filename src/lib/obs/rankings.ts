@@ -72,7 +72,10 @@ export function windows(now: number) {
   const txProv = win(s8, next8(s8, 20), now);
   const tnProv = win(s20, morning(s20), now);
   const tnFinStart = tnProv.final ? s20 : lastLocalHour(s20 - H, 20);
+  // Matin : 5 h → 10 h locales (le minimum tombe souvent après le lever du soleil, hors de la nuit 20 h → 8 h), le dernier commencé.
+  const s5 = lastLocalHour(now, 5);
   return {
+    matin: win(s5, s5 + 5 * H, now),
     txProv,
     txFin: win(lastLocalHour(s8 - H, 8), s8, now),
     tnProv,
@@ -172,7 +175,7 @@ export const WINDCHILL_SCALE = [
 
 export type RankingId =
   | 't' | 'dt24' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records' | 'tx12' | 'tx24'
-  | 'tn-prov' | 'tn-0618' | 'tn-1806' | 'tn-fin' | 'tn12' | 'tn24'
+  | 'tn-prov' | 'tn-matin' | 'tn-0618' | 'tn-1806' | 'tn-fin' | 'tn12' | 'tn24'
   | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr0' | 'rr24c' | 'rr36' | 'rr48' | 'rr72'
   | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf36' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp6' | 'dp9' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
@@ -306,6 +309,7 @@ export const RANKINGS: Ranking[] = [
   { id: 'tx12', short: 'TX 12 h', label: 'Classement des températures maximales sur 12 heures glissantes', group: TX, ...T, order: 'desc', temp: true, value: txGlissante(12) },
   { id: 'tx24', short: 'TX 24 h', label: 'Classement des températures maximales sur 24 heures glissantes', group: TX, ...T, order: 'desc', temp: true, value: tx24 },
   { id: 'tn-prov', short: 'Class. TN prov.', label: 'Classement des températures minimales provisoires (20 h → 8 h locales)', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnProv, value: (o, w, n) => aggMin(o, w.tnProv, n) },
+  { id: 'tn-matin', short: 'Class. TN matin', label: 'Classement des températures minimales de ce matin (5 h → 10 h locales)', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.matin, value: (o, w, n) => aggMin(o, w.matin, n) },
   { id: 'tn-0618', short: 'Class. TN 06-18 UTC', label: 'Classement des températures minimales de 06 à 18 UTC', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.day, value: (o, w, n) => aggMin(o, w.day, n) },
   { id: 'tn-1806', short: 'Class. TN 18-06 UTC', label: 'Classement des températures minimales de 18 à 06 UTC', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.night, value: (o, w, n) => aggMin(o, w.night, n) },
   { id: 'tn-fin', short: 'Class. TN finales', label: 'Classement des températures minimales finales (20 h → 8 h locales)', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnFin, value: (o, w, n) => tnFin(o, w, n) },

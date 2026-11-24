@@ -25,6 +25,8 @@ export default function TemperaturesDirect() {
   const [logoId, setLogoId] = useState('aucun');
   const zone = useZone('zone-temperatures-en-direct');
   const [journee, setJournee] = useState(THEMES_JOURNEE[0]?.id ?? '');
+  // Minimales (nuit, matin, nuit dernière) : stations de plaine, 300 m au plus par défaut (500 m en option) ; 0 = toutes les altitudes.
+  const [altMini, setAltMini] = useState(300);
 
   /** Points de chaque vue ; le relevé du moment est contrôlé par les stations voisines, les records sont propres à chaque station. */
   const points = useMemo(() => {
@@ -34,9 +36,10 @@ export default function TemperaturesDirect() {
       const liste = pointsDuBilan(bilans, theme.id);
       resultat[theme.id] = theme.direct.vue === 'releve' ? sansValeursAberrantes(liste) : liste;
     }
-    for (const theme of THEMES_JOURNEE) resultat[theme.id] = sansValeursAberrantes(pointsDuBilan(bilans, theme.id));
+    // Les stations de montagne (Aiguille du Midi à -16°…) écraseraient les minimales : on garde la plaine, sauf demande contraire.
+    for (const theme of THEMES_JOURNEE) resultat[theme.id] = sansValeursAberrantes(pointsDuBilan(bilans, theme.id, theme.ordre === 'asc' && altMini > 0 ? altMini : Infinity));
     return resultat;
-  }, [bilans]);
+  }, [bilans, altMini]);
 
   // Vues de la journée qui ont des valeurs (la nuit en cours, 20 h → 8 h, n'a encore rien en fin d'après-midi) ; la vue choisie,
   // ou à défaut la première disponible.
@@ -119,12 +122,23 @@ export default function TemperaturesDirect() {
               </button>
             ))}
           </div>
+          {journeeAffichee.ordre === 'asc' && (
+            <label className="mb-3 flex flex-wrap items-center justify-center gap-2 text-sm font-medium">
+              Stations
+              <select value={altMini} onChange={(e) => setAltMini(Number(e.target.value))} className={selectBarre} title="Les stations de montagne écrasent les minimales : la plaine (300 m au plus) est retenue par défaut">
+                <option value={300}>de plaine : 300 m et moins (par défaut)</option>
+                <option value={500}>jusqu’à 500 m</option>
+                <option value={0}>de toutes altitudes (montagne comprise)</option>
+              </select>
+            </label>
+          )}
           {[journeeAffichee].map((t) => (
             <CarteInfo
               key={t.id}
               theme={t}
               zone={zone.zone}
               points={points[t.id] ?? []}
+              legendeAltitude={t.ordre === 'asc' && altMini > 0 ? `${altMini.toLocaleString('fr-FR')} m et moins` : ''}
               sousTitre={sousTitre(t.id)}
               logoId={logoId}
               prefixeFichier={`temperatures-journee-${zone.nomFichier}`}

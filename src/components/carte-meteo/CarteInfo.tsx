@@ -13,7 +13,7 @@ import { cheminPictoImage, type ThemeCarte } from '@/lib/carte-meteo/pictos';
 import type { Couche } from '@/lib/carte-meteo/tuiles';
 import type { StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { angleFleche } from '@/lib/carte-meteo/vent';
-import { PALIERS_NEIGE, nuitTerminee, palierDe, texteInfo, titreCarte, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
+import { PALIERS_NEIGE, palierDe, texteInfo, titreCarte, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
 import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTILE, codesDeLaZone, normaliser, useContours, useFleuves } from './CarteMeteo';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
@@ -246,10 +246,10 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
   const [enExport, setEnExport] = useState(false);
-  // Minimales de la nuit : « (PROVISOIRES) » disparaît à partir de 8 h (heure de Paris). Lu après l'affichage (pas de décalage serveur / navigateur), revu toutes les 5 minutes.
-  const [nuitFinie, setNuitFinie] = useState(false);
+  // Minimales de la nuit et de ce matin : « (PROVISOIRES) » disparaît à 8 h, puis à 10 h (heure de Paris). Heure lue après l'affichage (pas de décalage serveur / navigateur), revue toutes les 5 minutes.
+  const [heureLue, setHeureLue] = useState<number | null>(null);
   useEffect(() => {
-    const lire = () => setNuitFinie(nuitTerminee());
+    const lire = () => setHeureLue(Date.now());
     lire();
     const minuteur = setInterval(lire, 300_000);
     return () => clearInterval(minuteur);
@@ -322,7 +322,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   const bulletinTemperature = enZones && estBulletinTemperature(theme.id);
   const zonesTemperature = enZones && enClassesTemperature(theme);
   const picto: PictoZones = zonesTemperature ? 'thermometre' : pictoZones(theme);
-  const titreTheme = titreCarte(theme, nuitFinie);
+  const titreTheme = titreCarte(theme, heureLue);
   const titre = titreSaisi ?? (pluiePro ? 'RISQUE DE FORTES PLUIES' : enZones ? (bulletinTemperature ? (dateCarte ? titreDateZones(dateCarte) : theme.court) : titreEnMinuscules(titreTheme)) : titreTheme);
   // Heure du run : « AROME (12z) » à la place du nom du modèle quand le sous-titre le contient, sinon ajouté à la fin.
   const sousTitreAvecRun = (() => {
