@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { palierDe, texteInfo, THEMES_BILAN, type ThemeBilan } from '@/lib/carte-meteo/cartes-info';
+import { nuitTerminee, palierDe, texteInfo, THEMES_BILAN, titreCarte, type ThemeBilan } from '@/lib/carte-meteo/cartes-info';
 import { COLONNES, uniteEntete } from '@/lib/carte-meteo/colonnes-releves';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
@@ -38,14 +38,14 @@ interface ModeleTab {
   /** Sens du classement ; absent : celui de la mesure. */
   sens?: 'asc' | 'desc';
   /** Période écrite dans le sous-titre. */
-  periode: (aujourdhui: string) => string;
+  periode: (aujourdhui: string, nuitFinie: boolean) => string;
 }
 const hier = (a: string) => ajouterJours(a, -1);
 const MODELES_TAB: ModeleTab[] = [
   { id: 'tx-hier', libelle: '🔥 T° maxi d’hier', themeId: 'tx-veille-direct', sens: 'desc', periode: (a) => `HIER · ${jourLong(hier(a))}` },
   { id: 'tn-nuit', libelle: '🥶 T° mini de la nuit dernière', themeId: 'tn-veille-direct', sens: 'asc', periode: (a) => `NUIT DU ${jourCourt(hier(a))} AU ${jourLong(a)}` },
   { id: 'tx-jour', libelle: '☀️ T° maxi du jour', themeId: 'tx-jour-direct', sens: 'desc', periode: (a) => `AUJOURD’HUI · ${jourLong(a)} (PROVISOIRE)` },
-  { id: 'tn-jour', libelle: '❄️ T° mini de cette nuit', themeId: 'tn-jour-direct', sens: 'asc', periode: (a) => `NUIT DU ${jourCourt(hier(a))} AU ${jourLong(a)} (PROVISOIRE)` },
+  { id: 'tn-jour', libelle: '❄️ T° mini de cette nuit', themeId: 'tn-jour-direct', sens: 'asc', periode: (a, nuitFinie) => `NUIT DU ${jourCourt(hier(a))} AU ${jourLong(a)}${nuitFinie ? '' : ' (PROVISOIRE)'}` },
   { id: 't-moment', libelle: '🌡️ T° du moment', themeId: 'obs-t', sens: 'desc', titre: 'TEMPÉRATURES DU MOMENT', periode: () => 'RELEVÉS DU MOMENT' },
   { id: 'raf-hier', libelle: '💨 Rafales maxi d’hier', themeId: 'obs-raf24', sens: 'desc', titre: 'RAFALES MAXIMALES D’HIER', periode: (a) => `HIER · ${jourLong(hier(a))}` },
   { id: 'raf-24h', libelle: '💨 Rafales maxi (24 h)', themeId: 'obs-raf24', sens: 'desc', periode: () => 'LES 24 DERNIÈRES HEURES' },
@@ -123,8 +123,11 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
   }, [lecture, classement, sens, nombre]);
 
   const suffixe = classement === 'liste' || !theme ? '' : sens === theme.ordre && theme.titreTop ? theme.titreTop.toUpperCase() : sens === 'asc' ? 'LES PLUS BAS' : 'LES PLUS ÉLEVÉS';
-  const titreAuto = theme ? `${modele.titre ?? theme.titre}${suffixe ? ` : ${suffixe}` : ''}` : '';
-  const sousTitreAuto = [modele.periode(aujourdhui), lieu.toUpperCase()].filter(Boolean).join(' · ');
+  // Minimales de la nuit : plus « provisoires » à partir de 8 h (heure de Paris) ; lu après l'affichage pour éviter un décalage serveur / navigateur.
+  const [nuitFinie, setNuitFinie] = useState(false);
+  useEffect(() => setNuitFinie(nuitTerminee()), []);
+  const titreAuto = theme ? `${modele.titre ?? titreCarte(theme, nuitFinie)}${suffixe ? ` : ${suffixe}` : ''}` : '';
+  const sousTitreAuto = [modele.periode(aujourdhui, nuitFinie), lieu.toUpperCase()].filter(Boolean).join(' · ');
   const titre = titreSaisi ?? titreAuto;
   const sousTitre = sousTitreSaisi ?? sousTitreAuto;
   const logo = LOGOS_PRESETS.find((l) => l.id === logoId);

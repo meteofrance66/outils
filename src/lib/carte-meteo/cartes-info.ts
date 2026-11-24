@@ -785,6 +785,16 @@ export function valeurPlausible(theme: ThemeInfo, v: number): boolean {
 
 export const palierDe = (paliers: Palier[], v: number): Palier => paliers.find((x) => v >= x.min) ?? paliers[paliers.length - 1];
 
+/** Nuit (20 h → 8 h, heure de Paris) terminée : de 8 h à 20 h, la minimale de la nuit est définitive, plus provisoire. */
+export function nuitTerminee(maintenant = Date.now()): boolean {
+  const heure = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Paris' }).format(maintenant));
+  return heure >= 8 && heure < 20;
+}
+
+/** Titre d'une carte : « MINIMALES DE LA NUIT (PROVISOIRES) » perd « (PROVISOIRES) » une fois la nuit terminée (8 h passées). */
+export const titreCarte = (theme: Pick<ThemeInfo, 'id' | 'titre'>, nuitFinie: boolean): string =>
+  nuitFinie && (theme.id === 'tn-prov' || theme.id === 'tn-jour-direct') ? theme.titre.replace(/ \(PROVISOIRES\)$/, '') : theme.titre;
+
 /** Texte d'une valeur : arrondi, signe, unité courte (le degré est collé au nombre). */
 export function texteInfo(theme: ThemeInfo, v: number): string {
   if (theme.texteValeur) return theme.texteValeur(v);

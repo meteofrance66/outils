@@ -13,7 +13,7 @@ import { cheminPictoImage, type ThemeCarte } from '@/lib/carte-meteo/pictos';
 import type { Couche } from '@/lib/carte-meteo/tuiles';
 import type { StyleFond } from '@/lib/carte-meteo/styles-fond';
 import { angleFleche } from '@/lib/carte-meteo/vent';
-import { PALIERS_NEIGE, palierDe, texteInfo, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
+import { PALIERS_NEIGE, nuitTerminee, palierDe, texteInfo, titreCarte, valeurPlausible, type ThemeInfo } from '@/lib/carte-meteo/cartes-info';
 import CarteRendu, { HAUTEUR_CARTE, LARGEUR_CARTE } from './CarteRendu';
 import { BOITE_FRANCE, FICHIERS_CONTOURS, LARGEUR_FRANCE, ZONE_FRANCE, ZONE_UTILE, codesDeLaZone, normaliser, useContours, useFleuves } from './CarteMeteo';
 import { DEPARTEMENTS_FR } from '@/lib/carte-meteo/departements-fr';
@@ -207,6 +207,8 @@ const AUCUN = new Set<string>();
 const MARGE_COLONNE = 22;
 const LARGEUR_ENCADRE = 178;
 const NOMBRE_TOP = 5;
+/** Cartes de toutes les stations : nombre de valeurs les plus remarquables (les plus froides, les plus fortes…) toujours affichées. */
+const NOMBRE_MARQUANTES_TOUTES = 15;
 /** Nombre maximal de valeurs affichées, et stations retenues par département avant la répartition. */
 const PLAFOND = { france: 48, region: 36, departement: 24 };
 const PAR_DEPARTEMENT = { france: 1, region: 4, departement: Infinity };
@@ -217,6 +219,13 @@ const moyenne = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 const ZONE_FRANCE_ZONES = { gauche: 150, haut: 100, droite: LARGEUR_FRANCE - 12, bas: HAUTEUR_CARTE - 34 };
 /** Région en format carré : même colonne de gauche (classement, légende) que le 16:9, cadrage sur toute la hauteur. */
 const ZONE_UTILE_CARRE = { gauche: 215, haut: 80, droite: LARGEUR_CARTE - 28, bas: LARGEUR_CARTE - 30 };
+/**
+ * Région ou grande zone très large en format carré (Nord, Sud, Occitanie, Bretagne…) : elle prend tout le cadre et se centre au milieu. La colonne
+ * de gauche n'a pas à lui être réservée : le classement et la légende trouvent leur place dans les bandes libres au-dessus et au-dessous.
+ */
+const ZONE_CARRE_LARGE = { gauche: 28, haut: 50, droite: LARGEUR_CARTE - 28, bas: LARGEUR_CARTE - 50 };
+/** Une zone prend tout le cadre carré si, ainsi cadrée, elle occupe au plus cette part de sa hauteur (sinon : colonne de gauche réservée). */
+const PART_HAUTEUR_CARRE_LARGE = 0.6;
 const POLICE_ZONES = 'Arial, Helvetica, sans-serif';
 
 /** Titre d'une carte en zones (hors bulletins de températures) : titre du thème en minuscules (« Cumuls de pluie »). */
@@ -237,6 +246,14 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   const colonneRef = useRef<HTMLDivElement>(null);
   const [facteur, setFacteur] = useState(1);
   const [enExport, setEnExport] = useState(false);
+  // Minimales de la nuit : « (PROVISOIRES) » disparaît à partir de 8 h (heure de Paris). Lu après l'affichage (pas de décalage serveur / navigateur), revu toutes les 5 minutes.
+  const [nuitFinie, setNuitFinie] = useState(false);
+  useEffect(() => {
+    const lire = () => setNuitFinie(nuitTerminee());
+    lire();
+    const minuteur = setInterval(lire, 300_000);
+    return () => clearInterval(minuteur);
+  }, []);
   // Clic = changer le picto ; glisser (plus de 4 px) = le déplacer. Les pixels écran sont ramenés à ceux de la carte (facteur).
   const debutPicto = (e: React.PointerEvent<HTMLElement>, code: string, decalages = decalagesPictos, onMove = onPictoMove, onClic: typeof onPictoClick = onPictoClick) => {
     if (e.button !== 0) return;
@@ -305,7 +322,8 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   const bulletinTemperature = enZones && estBulletinTemperature(theme.id);
   const zonesTemperature = enZones && enClassesTemperature(theme);
   const picto: PictoZones = zonesTemperature ? 'thermometre' : pictoZones(theme);
-  const titre = titreSaisi ?? (pluiePro ? 'RISQUE DE FORTES PLUIES' : enZones ? (bulletinTemperature ? (dateCarte ? titreDateZones(dateCarte) : theme.court) : titreEnMinuscules(theme.titre)) : theme.titre);
+  const titreTheme = titreCarte(theme, nuitFinie);
+  const titre = titreSaisi ?? (pluiePro ? 'RISQUE DE FORTES PLUIES' : enZones ? (bulletinTemperature ? (dateCarte ? titreDateZones(dateCarte) : theme.court) : titreEnMinuscules(titreTheme)) : titreTheme);
   // Heure du run : « AROME (12z) » à la place du nom du modèle quand le sous-titre le contient, sinon ajouté à la fin.
   const sousTitreAvecRun = (() => {
     if (!affichage?.heureRun || !run) return sousTitre;
@@ -381,7 +399,10 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
     // Zones et fourchettes, France : la colonne de gauche reste libre pour le grand thermomètre, le haut pour le titre.
     if (pluiePro) return ajusterVue(boite, { gauche: 190, haut: 150, droite: largeur - 18, bas: hauteurCarte - 62 }, 0.01);
     if (enZones && enFrance) return ajusterVue(boite, ZONE_FRANCE_ZONES, 0.01);
-    if (carreActif) return ajusterVue(boite, ZONE_UTILE_CARRE, 0.06);
+    if (carreActif) {
+      const pleine = ajusterVue(boite, ZONE_CARRE_LARGE, 0.06);
+      return (boite.maxY - boite.minY) * pleine.echelle <= PART_HAUTEUR_CARRE_LARGE * LARGEUR_CARTE ? pleine : ajusterVue(boite, ZONE_UTILE_CARRE, 0.06);
+    }
     return enFrance ? ajusterVue(boite, ZONE_FRANCE, 0.01) : ajusterVue(boite, ZONE_UTILE, enDepartement ? 0.03 : 0.06);
   }, [contoursDep, selection, enFrance, enDepartement, enZones, pluiePro, largeur, carreActif]);
 
@@ -612,14 +633,26 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
       parDep.set(p.dep, n + 1);
       return n < parDepartementMax;
     });
-    for (const p of top) if (!candidats.includes(p)) candidats.push(p);
+    // Valeurs marquantes : jamais écartées et placées avant les autres. Les 5 du classement ; sur les cartes de toutes les stations
+    // (minimales, maximales, pluie, rafales…), les plus remarquables de la zone (les plus froides, les plus fortes…), sinon elles
+    // se perdaient derrière les grandes villes et les stations bien réparties sur la carte.
+    const marquantes = theme.toutes ? triesClassement.filter((p) => !p.neige && !palierDe(theme.paliers, p.valeur).neutre).slice(0, NOMBRE_MARQUANTES_TOUTES) : top;
+    for (const p of marquantes) if (!candidats.includes(p)) candidats.push(p);
     const ecran = candidats.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => e.x > 0 && e.x < largeur && e.y > 0 && e.y < hauteurCarte);
     // Puis répartis sur la zone : les N premiers sont toujours bien espacés.
     const rang = new Map(ordreRepartition(ecran.map((e) => ({ code: e.p.code, x: e.x, y: e.y }))).map((code, i) => [code, i]));
-    const codesTop = new Set(top.map((p) => p.code));
-    const elements = ecran
-      .sort((a, b) => Number(grandesVilles.has(b.p.code)) - Number(grandesVilles.has(a.p.code)) || (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0))
-      .slice(0, plafond * 2)
+    const codesTop = new Set(marquantes.map((p) => p.code));
+    // Les marquantes d'abord, de la plus extrême à la moins extrême : en cas de voisines serrées (Moselle…), les plus froides gardent leur place.
+    const rangMarquante = new Map(marquantes.map((p, i) => [p.code, i]));
+    const triees = ecran.sort(
+      (a, b) =>
+        (rangMarquante.get(a.p.code) ?? 1e9) - (rangMarquante.get(b.p.code) ?? 1e9) ||
+        Number(grandesVilles.has(b.p.code)) - Number(grandesVilles.has(a.p.code)) ||
+        (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)
+    );
+    // Les prioritaires (marquantes, grandes villes) sont toutes gardées ; la coupe à `plafond * 2` ne porte que sur les autres.
+    const prioritaire = (e: { p: PointInfo }) => codesTop.has(e.p.code) || grandesVilles.has(e.p.code);
+    const elements = [...triees.filter(prioritaire), ...triees.filter((e) => !prioritaire(e)).slice(0, plafond * 2)]
       .map((e) => {
         const texte = texteInfo(theme, e.p.valeur);
         const largeurBulle = (texte.length * 0.56 + (uniteDe(e.p) ? uniteDe(e.p).length * 0.42 + 0.25 : 0) + 0.95 + (avecFleche(e.p) ? 1.05 : 0)) * taille;
@@ -668,7 +701,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
       .filter((e) => e.priorite === 0 || restantes-- > 0)
       .map((e) => ({ p: parCode.get(e.code)!, ...positions.get(e.code)!, ...origine.get(e.code)! }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tries, top, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, avecReperes, echNoms, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos, enZones, valeursEnMer]);
+  }, [tries, top, triesClassement, vue, contoursDep.length, theme, niveau, largeur, taille, hauteurTop, hauteurLegende, logoUrl, hauteurLogo, enDepartement, enFrance, avecNoms, avecReperes, echNoms, cleTexte, largeurTitre, hauteurSeuils, plafond, parDepartementMax, pictos, enZones, valeursEnMer]);
 
   // Zones et fourchettes : une étiquette par zone (fourchette, avec un petit picto sur les grandes zones) et une par valeur
   // locale, posées au centre de leur zone puis écartées au besoin pour ne pas se chevaucher.
