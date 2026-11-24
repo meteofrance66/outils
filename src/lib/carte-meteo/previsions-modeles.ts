@@ -567,8 +567,8 @@ function valeursSurPeriode(
 }
 
 /**
- * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h (température : celle de 8 h), l’après-midi de 12 h à 18 h (température : maximum de 14 h à 18 h), la journée de 7 h à 20 h pour le
- * ciel. Le minimum de la nuit n'est donné que si la série couvre le début de la journée (avant 7 h).
+ * Point de la carte pour un jour (date locale, Paris) : le matin va de 6 h à 12 h (température : celle de 8 h), l’après-midi de 12 h à 18 h (température : maximum de 13 h à 18 h), la journée de 7 h à 20 h pour le
+ * ciel. Le minimum de la nuit n’est donné que si la série couvre le début de la journée (avant 7 h).
  */
 export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateISO: string, finPeriode?: string): PointCarte {
   // Températures hors de -25 à 47 °C et vents au-delà de 250 km/h : erreurs du modèle, jamais affichées.
@@ -585,8 +585,8 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
   // qui donnait la valeur de 11 h, presque celle de l'après-midi (18° à Perpignan un matin à 9°). Sans heure du petit matin
   // dans la série (prévision du jour lancée après 9 h), pas de valeur plutôt qu'une valeur de fin de matinée.
   const debutMatin = jour.filter((l) => l.heure >= 6 && l.heure <= 9 && serie.temp[l.i] != null).sort((a, b) => Math.abs(a.heure - 8) - Math.abs(b.heure - 8) || a.heure - b.heure);
-  const apresMidi = jour.filter((l) => l.heure >= 15 && l.heure <= 18).map((l) => l.i);
-  // Après-midi : 15 h à 18 h (heure de Paris), moyenne des échéances pour la température, le ciel et la pluie.
+  const apresMidi = jour.filter((l) => l.heure >= 13 && l.heure <= 18).map((l) => l.i);
+  // Après-midi : 13 h à 18 h (heure de Paris), maximum pour la température.
   const chaleurApresMidi = apresMidi;
   // Pictos des vidéos : le temps entre 14 h et 18 h.
   const creneauVideo = jour.filter((l) => l.heure >= 14 && l.heure <= 18).map((l) => l.i);
@@ -610,7 +610,7 @@ export function pointDepuisSerie(code: string, nom: string, brute: Serie, dateIS
     codeMatin: codePeriode(serie, matin),
     nuagesMatin: arrondi(moyenne(matin.map((i) => serie.nuages[i]))),
     pluieMatin: arrondi(somme(matin.map((i) => serie.pluie[i])), 1),
-    tempApresMidi: arrondi(moyenne(chaleurApresMidi.map((i) => serie.temp[i])), 1),
+    tempApresMidi: arrondi(maximum(chaleurApresMidi.map((i) => serie.temp[i])), 1),
     rafaleApresMidi: arrondi(maximum(apresMidi.map((i) => serie.rafale[i]))),
     rafaleJournee: arrondi(maximum(toute.map((i) => serie.rafale[i]))),
     directionRafaleApresMidi: directionRafaleMax(serie, apresMidi),
