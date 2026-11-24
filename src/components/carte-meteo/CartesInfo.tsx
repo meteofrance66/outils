@@ -1129,7 +1129,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
           {!uneCarte && (mode === 'prevision' || mode === 'bilan') && (
             <div className="w-full space-y-2" role="group" aria-label="Sélection météo">
               {mode === 'prevision' && <div className="flex flex-wrap gap-1.5" role="group" aria-label="Échéance des alertes">
-                {[0, 1, 2, 3, 4, 5].map((j) => <button key={j} type="button" aria-pressed={alerteParJour && jour === j} onClick={() => { changerJour(j); setAlerteParJour(true); setGroupeChoisi(GROUPE_RISQUES); }} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${alerteParJour && jour === j ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>J{j}</button>)}
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((j) => <button key={j} type="button" aria-pressed={alerteParJour && jour === j} onClick={() => { changerJour(j); setAlerteParJour(true); setGroupeChoisi(GROUPE_RISQUES); }} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${alerteParJour && jour === j ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>J{j}</button>)}
                 <button type="button" aria-pressed={!alerteParJour} onClick={() => { setAlerteParJour(false); setGroupeChoisi(GROUPE_RISQUES); }} className={`rounded-xl border px-4 py-1.5 text-base font-bold ${!alerteParJour ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>Toutes les périodes</button>
               </div>}
               {mode === 'bilan' && <div className="flex flex-wrap gap-1.5" role="group" aria-label="Période des bilans">
