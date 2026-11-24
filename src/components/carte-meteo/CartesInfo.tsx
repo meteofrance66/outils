@@ -287,6 +287,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   /** Cartes de risque : durée choisie (par défaut une période) ; la liste ne garde qu'une entrée par risque, la durée se change dans le menu « Durée du risque ». */
   /** Cartes de risque : relief (altitude minimale des communes, en m) ; 0 = plaine, comme les autres cartes. */
   const [reliefAlt, setReliefAlt] = useState<0 | 300 | 500 | 1000 | 2000>(0);
+  /** Cartes de pluie de la France : cumul de la commune la plus arrosée parmi celles à X m et moins ; 0 = toutes les communes (par défaut). */
+  const [pluieAlt, setPluieAlt] = useState<0 | 300 | 500 | 1000 | 2000>(0);
   const [dureeRisque, setDureeRisque] = useState<'jour' | 'periode' | '24h'>('periode');
   const [affichage, setAffichage] = useState<AffichageCarte>({ theme: null, fond: null, relief: true, reliefPourcent: 22, fleuves: null, opaciteFleuves: 100, contours: 'defaut', heureRun: true, dateElaboration: true, seuilPluie: uneCarte ? 10 : 0, seuils: uneCarte ? { mm: 10, 'km/h': 60 } : undefined, reperes: false, policeValeurs: 'condensee', tailleNoms: 1.2 });
   const themesPrevision = useMemo<ThemePrevision[]>(
@@ -367,7 +369,11 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const enDepartement = niveau === 'departement';
   const dateISO = ajouterJours(aujourdhui, jour);
   // Département : ses villes ; région : les villes de chacun de ses départements ; France : un point par département.
-  const requeteZone = zonageFin && mode === 'prevision' && niveau === 'france' ? '&zones=9' : niveau === 'departement' ? `&dep=${departement}` : niveau === 'region' && !region.startsWith('gz:') ? `&deps=${codesDeLaZone(zone).join(',')}` : '';
+  // Carte de France (et grandes zones, qui en reprennent les données) : le menu « Pluie » limite les communes à X m et moins (le cumul vient d'une commune du département).
+  const parametrePluieAlt = pluieAlt > 0 && (niveau === 'france' || (niveau === 'region' && region.startsWith('gz:'))) ? `&pluiealt=${pluieAlt}` : '';
+  const requeteZone = zonageFin && mode === 'prevision' && niveau === 'france' ? '&zones=9' : niveau === 'departement' ? `&dep=${departement}` : niveau === 'region' && !region.startsWith('gz:') ? `&deps=${codesDeLaZone(zone).join(',')}` : parametrePluieAlt;
+  /** Carte de cumul de pluie dont la valeur est celle de la commune la plus arrosée parmi celles à X m et moins (légende et sous-titre le disent). */
+  const cumulPluieAlt = (t: ThemeInfo) => parametrePluieAlt !== '' && !(zonageFin && mode === 'prevision' && niveau === 'france') && mode === 'prevision' && /^(pluie(?!-neige)|risque-pluie)/.test(t.id) && !(t as ThemePrevision).montagne;
   // Grandes zones (Nord, Sud, NO, NE, SO, SE) : les données de la France entière (un point par département), cadrées sur la zone.
   const cle = `${modele}|${dateISO}|${requeteZone}`;
   /** Clé des prévisions d'un autre modèle pour sa carte « jusqu'à la fin du run » : toujours à partir d'aujourd'hui (le run part de maintenant). */
@@ -837,6 +843,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
         prendre<boolean>('sansTableau', setSansTableau);
         prendre<boolean>('chiffres', setChiffres);
         prendre<0 | 300 | 500 | 1000 | 2000>('reliefAlt', setReliefAlt);
+        prendre<0 | 300 | 500 | 1000 | 2000>('pluieAlt', setPluieAlt);
         prendre<'jour' | 'periode' | '24h'>('dureeRisque', setDureeRisque);
         prendre<boolean>('zonageFin', setZonageFin);
         prendre<Horizon>('horizon', setHorizon);
@@ -874,7 +881,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
       try {
         localStorage.setItem(
           CLE_CARTE_FIGEE,
-          JSON.stringify({ aujourdhui, mode, niveau, region, departement, modele, jour, logoChoisi, tailleValeurs, tailleTableau, sansTableau, chiffres, reliefAlt, dureeRisque, zonageFin, horizon, altitudeMax, groupeChoisi, carteChoisie, filtreGroupe, affichage, periodePluie, moisBilan, runModele, previsions, cumuls, montagne, pluiePeriode, montagnePeriode, bilans: mode === 'bilan' ? bilans : null, retouches: retouchesCartes, figeeLe })
+          JSON.stringify({ aujourdhui, mode, niveau, region, departement, modele, jour, logoChoisi, tailleValeurs, tailleTableau, sansTableau, chiffres, reliefAlt, pluieAlt, dureeRisque, zonageFin, horizon, altitudeMax, groupeChoisi, carteChoisie, filtreGroupe, affichage, periodePluie, moisBilan, runModele, previsions, cumuls, montagne, pluiePeriode, montagnePeriode, bilans: mode === 'bilan' ? bilans : null, retouches: retouchesCartes, figeeLe })
         );
         setErreurFiger(null);
       } catch {
@@ -883,7 +890,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     }, 400);
     return () => clearTimeout(minuteur);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [figee, aujourdhui, mode, niveau, region, departement, modele, jour, logoChoisi, tailleValeurs, tailleTableau, sansTableau, chiffres, reliefAlt, dureeRisque, zonageFin, horizon, altitudeMax, groupeChoisi, carteChoisie, filtreGroupe, affichage, periodePluie, moisBilan, runModele, previsions, cumuls, montagne, pluiePeriode, montagnePeriode, bilans, retouchesCartes, figeeLe]);
+  }, [figee, aujourdhui, mode, niveau, region, departement, modele, jour, logoChoisi, tailleValeurs, tailleTableau, sansTableau, chiffres, reliefAlt, pluieAlt, dureeRisque, zonageFin, horizon, altitudeMax, groupeChoisi, carteChoisie, filtreGroupe, affichage, periodePluie, moisBilan, runModele, previsions, cumuls, montagne, pluiePeriode, montagnePeriode, bilans, retouchesCartes, figeeLe]);
   // ── Choix gardés d'une visite à l'autre (pages à plusieurs cartes) ────────────────────────────────────────────────────
   // Sans ça, revenir sur la page (retour arrière, autre onglet du menu puis retour) remettait tous les choix à zéro : danger, zone, modèle, jour…
   // Gardés dans l'onglet (sessionStorage), par page : ?cartes=alertes, ?cartes=europe… ont chacune leurs choix. Le lien du menu garde la main
@@ -912,6 +919,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
         prendre<ModeleMeteo>('modele', setModele);
         prendre<number>('jour', setJour);
         prendre<boolean>('sansTableau', setSansTableau);
+        prendre<0 | 300 | 500 | 1000 | 2000>('pluieAlt', setPluieAlt);
         prendre<'jour' | 'periode' | '24h'>('dureeRisque', setDureeRisque);
         prendre<Horizon>('horizon', setHorizon);
         if (!alertesDemandees) {
@@ -929,11 +937,11 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
     // Rien n'est écrit avant la lecture : sinon les valeurs par défaut écraseraient les choix gardés.
     if (uneCarte || !selectionLue) return;
     try {
-      sessionStorage.setItem(cleSelection, JSON.stringify({ mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, sansTableau, dureeRisque, horizon, chiffres, zonageFin }));
+      sessionStorage.setItem(cleSelection, JSON.stringify({ mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, sansTableau, pluieAlt, dureeRisque, horizon, chiffres, zonageFin }));
     } catch {
       // Stockage bloqué (navigation privée) : les choix restent valables tant que la page est ouverte.
     }
-  }, [uneCarte, selectionLue, cleSelection, mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, sansTableau, dureeRisque, horizon, chiffres, zonageFin]);
+  }, [uneCarte, selectionLue, cleSelection, mode, groupeChoisi, dangerChoisi, niveau, region, departement, modele, jour, sansTableau, pluieAlt, dureeRisque, horizon, chiffres, zonageFin]);
   /** La carte affichée a toutes ses données : seule une carte complète peut être figée. */
   const peutFiger = uneCarte && !chargement && !erreurAffichee && (mode !== 'prevision' || (!!carteEffective && !!pointsPrevision[carteEffective.id]));
   /** Instant où la carte a été figée : « Carte élaborée le » et les fenêtres « depuis maintenant » le gardent au lieu de suivre l'horloge. */
@@ -1476,6 +1484,19 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               </select>
             </label>
           )}
+          {mode === 'prevision' && (niveau === 'france' || (niveau === 'region' && region.startsWith('gz:'))) && !zonageFin &&
+            (groupeChoisi === 'Pluie' || groupeChoisi === ESSENTIEL || (groupeChoisi === GROUPE_RISQUES && dangerChoisi === 'risque-pluie') || (uneCarte && carteEffective?.groupe === 'Pluie')) && (
+            <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-2' : ''}`} title="Les cumuls de la carte de France sont ceux de la commune la plus arrosée de chaque département : ce menu écarte les communes de montagne (et la neige d'altitude comptée en eau)">
+              <span className={legende}>🌧️ Pluie : altitude des communes</span>
+              <select value={pluieAlt} onChange={(e) => { setPluieAlt(Number(e.target.value) as 0 | 300 | 500 | 1000 | 2000); setErreur(null); }} className={`${selectBarre} font-semibold ${uneCarte ? 'w-full' : ''}`}>
+                <option value={0}>Toutes les communes (par défaut)</option>
+                <option value={300}>Communes à 300 m et moins</option>
+                <option value={500}>Communes à 500 m et moins</option>
+                <option value={1000}>Communes à 1 000 m et moins</option>
+                <option value={2000}>Communes à 2 000 m et moins</option>
+              </select>
+            </label>
+          )}
           {!uneCarte && (
             <>
               <label className="text-sm font-medium" title="Zones et fourchettes : départements regroupés en zones de même niveau, une fourchette de valeurs par zone">
@@ -1793,12 +1814,13 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                               ? `${libelleJour(dateISO)} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET ${theme.groupe === GROUPE_RISQUES && sensRelief === 'moins' ? 'MOINS' : 'PLUS'}`
                               : libelleJour(dateISO)) +
                           // Carte de risque sans aucune zone concernée : on l'écrit, plutôt que de laisser une carte qui paraît vide.
-                          (theme.groupe === GROUPE_RISQUES && (pointsPrevision[theme.id] ?? []).length > 0 && (pointsPrevision[theme.id] ?? []).every((q) => q.valeur === 0) ? ' · AUCUN RISQUE PRÉVU' : '')
+                          (theme.groupe === GROUPE_RISQUES && (pointsPrevision[theme.id] ?? []).length > 0 && (pointsPrevision[theme.id] ?? []).every((q) => q.valeur === 0) ? ' · AUCUN RISQUE PRÉVU' : '') +
+                          (cumulPluieAlt(theme) ? ` · COMMUNES À ${pluieAlt.toLocaleString('fr-FR')} M ET MOINS` : '')
                         }
                         logoId={logoId}
                         prefixeFichier={prefixe}
                         contexte={(theme as ThemePrevision).montagne ? `${infoRun(theme as ThemePrevision).contexte}, communes de montagne (point du modèle à ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} m ou ${theme.groupe === GROUPE_RISQUES && sensRelief === 'moins' ? 'moins' : 'plus'})` : infoRun(theme as ThemePrevision).contexte}
-                        legendeAltitude={theme.groupe === GROUPE_RISQUES && reliefAlt ? `${reliefAlt.toLocaleString('fr-FR')} m et ${sensRelief === 'moins' ? 'moins' : 'plus'}` : ''}
+                        legendeAltitude={theme.groupe === GROUPE_RISQUES && reliefAlt ? `${reliefAlt.toLocaleString('fr-FR')} m et ${sensRelief === 'moins' ? 'moins' : 'plus'}` : cumulPluieAlt(theme) ? `${pluieAlt.toLocaleString('fr-FR')} m et moins` : ''}
                       />
                     ) : mode === 'bilan' ? (
                       <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} {...retouchesDe(theme.id)} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />

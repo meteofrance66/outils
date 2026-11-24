@@ -380,6 +380,8 @@ function rafaleEntre(serie: Serie, debut: number, fin: number): { valeur: number
 export interface PluiePoints {
   t: string[];
   pluie: (number | null)[][];
+  /** Altitude (m) du point de grille de chaque série de `pluie`, dans le même ordre. */
+  altitudes?: number[];
 }
 
 export type PluiesMaximales = Pick<PointCarte, 'pluieJourneeMax' | 'pluie24hMax' | 'pluie36hMax' | 'pluiePeriodeMax' | 'pluie3jMax' | 'pluie5jMax' | 'pluie10jMax' | 'pluie16jMax' | 'pluieRun'>;
@@ -388,9 +390,16 @@ export type PluiesMaximales = Pick<PointCarte, 'pluieJourneeMax' | 'pluie24hMax'
  * Pluie de la commune la plus arrosée d'un département (carte de France par département), pour chaque fenêtre des cartes de
  * pluie. Mêmes fenêtres et même couverture minimale que pour la ville du département (cumulEntre) ; le jour est la vraie journée
  * de 24 h : l'échéance de 0 h est la pluie de l'heure qui précède, elle compte pour le jour qui finit. `maintenant` : instant de
- * départ des fenêtres glissantes (24 h, 36 h, jusqu'à la fin du run).
+ * départ des fenêtres glissantes (24 h, 36 h, jusqu'à la fin du run). `altitudeMax` (m) : seules les communes dont le point de grille est
+ * à cette altitude ou en dessous comptent (0 = toutes, hautes vallées et crêtes comprises) ; si aucune n'est assez basse, la plus basse.
  */
-export function pluiesMaximales(p: PluiePoints, dateISO: string, finPeriode?: string, maintenant = Date.now()): Partial<PluiesMaximales> {
+export function pluiesMaximales(p: PluiePoints, dateISO: string, finPeriode?: string, maintenant = Date.now(), altitudeMax = 0): Partial<PluiesMaximales> {
+  let series = p.pluie;
+  const altitudes = p.altitudes;
+  if (altitudeMax > 0 && altitudes && altitudes.length === p.pluie.length && p.pluie.length > 0) {
+    const basses = p.pluie.filter((_, i) => altitudes[i] <= altitudeMax);
+    series = basses.length ? basses : [p.pluie[altitudes.indexOf(Math.min(...altitudes))]];
+  }
   const ms = p.t.map((t) => Date.parse(t));
   const echeances = ms.filter((m) => Number.isFinite(m));
   const finRun = echeances.length ? Math.max(...echeances) : null;
@@ -423,7 +432,7 @@ export function pluiesMaximales(p: PluiePoints, dateISO: string, finPeriode?: st
     const finFenetre = cle === 'pluiePeriodeMax' && premiere >= 0 ? finEffectivePeriode(ms[0], ms[ms.length - 1], ms[derniere], fin) : fin;
     let meilleur: number | null = null;
     if (premiere >= 0) {
-      for (const serie of p.pluie) {
+      for (const serie of series) {
         let somme = 0;
         let derniereValeur = -1;
         for (let i = premiere; i <= derniere; i++) {

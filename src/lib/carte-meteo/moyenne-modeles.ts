@@ -88,8 +88,8 @@ async function moyenneDe<P extends PointCarte>(modeles: ModeleSource[], charger:
 }
 
 /** France (un point par département). */
-export const moyenneCarte = (dateISO: string, fin?: string) =>
-  moyenneDe(modelesDeLaMoyenne(dateISO, null, fin, true), (m) => chargerPrevisionsCarte(m, dateISO, fin));
+export const moyenneCarte = (dateISO: string, fin?: string, altitudePluie = 0) =>
+  moyenneDe(modelesDeLaMoyenne(dateISO, null, fin, true), (m) => chargerPrevisionsCarte(m, dateISO, fin, altitudePluie));
 
 /** Villes d'un ou de plusieurs départements (région) ; chaque point garde son département. */
 export const moyenneVilles = (dateISO: string, deps: string[], fin?: string) =>

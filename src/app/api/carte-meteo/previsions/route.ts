@@ -11,6 +11,12 @@ import { moyenneZones, moyenneCarte, moyenneMontagne, moyenneVilles } from '@/li
  * Prévisions AROME (Météo-France) ou CEP (ECMWF) lues dans les paquets départementaux publiés sur GitHub
  * (alertesmeteo-hub/arome-meteofrance et alertesmeteo-hub/cep), pour le générateur /outils/carte-meteo.
  */
+/** ?pluiealt=500 : carte de France, cumul de la commune la plus arrosée parmi celles à cette altitude (m) ou en dessous ; sans : toutes. */
+const altitudePluieDe = (url: URL) => {
+  const a = Number(url.searchParams.get('pluiealt'));
+  return [300, 500, 1000, 2000].includes(a) ? a : 0;
+};
+
 export async function GET(req: Request) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
   if (!rateLimit(`carte-meteo:${ip}`, 30, 60_000)) {
@@ -87,10 +93,10 @@ export async function GET(req: Request) {
   try {
     // Moyenne des modèles pour la France entière (un point par département) : moyenne des modèles qui couvrent le jour.
     if (modele === 'moyenne' && !dep && !deps) {
-      const { points, modeles } = await moyenneCarte(date, fin);
+      const { points, modeles } = await moyenneCarte(date, fin, altitudePluieDe(url));
       return NextResponse.json({ modele, date, dep, points, modeles }, { headers: { 'Cache-Control': 'public, max-age=300' } });
     }
-    const points = !dep && !deps && modele !== 'moyenne' && url.searchParams.get('zones') === '9' ? await chargerPrevisionsZones(modele, date, fin) : dep ? await chargerPrevisionsVilles(modele, date, dep, fin) : await chargerPrevisionsCarte(modele, date, fin);
+    const points = !dep && !deps && modele !== 'moyenne' && url.searchParams.get('zones') === '9' ? await chargerPrevisionsZones(modele, date, fin) : dep ? await chargerPrevisionsVilles(modele, date, dep, fin) : await chargerPrevisionsCarte(modele, date, fin, altitudePluieDe(url));
     return NextResponse.json({ modele, date, dep, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {
     const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');
@@ -126,7 +132,7 @@ async function moyenneComplete(url: URL, date: string) {
         ? await moyenneMontagne(date, liste, fin)
         : liste
           ? await moyenneVilles(date, liste, fin)
-          : url.searchParams.get('zones') === '9' ? await moyenneZones(date, fin) : await moyenneCarte(date, fin);
+          : url.searchParams.get('zones') === '9' ? await moyenneZones(date, fin) : await moyenneCarte(date, fin, altitudePluieDe(url));
     return NextResponse.json({ modele: 'moyenne', modeles, date, points }, { headers: { 'Cache-Control': 'public, max-age=300' } });
   } catch (erreur) {
     const sansDonnee = erreur instanceof Error && erreur.message.includes('aucune donnée');
