@@ -165,15 +165,15 @@ const caches = ((globalThis as { __cacheCarteMeteo?: unknown }).__cacheCarteMete
   memoire: new Map<string, Extrait>(),
   /** Lectures en cours : plusieurs requêtes simultanées pour le même département n'ouvrent qu'un seul téléchargement. */
   enCours: new Map<string, Promise<Extrait>>(),
-  indexCourant: new Map<ModeleSource, { t: number; runTime: string }>(),
-}) as { memoire: Map<string, Extrait>; enCours: Map<string, Promise<Extrait>>; indexCourant: Map<ModeleSource, { t: number; runTime: string }> };
+  indexCourant: new Map<string, { t: number; runTime: string }>(),
+}) as { memoire: Map<string, Extrait>; enCours: Map<string, Promise<Extrait>>; indexCourant: Map<string, { t: number; runTime: string }> };
 const { memoire, enCours, indexCourant } = caches;
 // Partager aussi les échecs : une source absente ne doit pas être interrogée
 // à nouveau pour chacun des 96 départements ni par chaque carte ouverte.
 const etatIndex = ((globalThis as { __etatIndexMeteo?: unknown }).__etatIndexMeteo ??= {
-  enCours: new Map<ModeleSource, Promise<string | null>>(),
-  echecs: new Map<ModeleSource, number>(),
-}) as { enCours: Map<ModeleSource, Promise<string | null>>; echecs: Map<ModeleSource, number> };
+  enCours: new Map<string, Promise<string | null>>(),
+  echecs: new Map<string, number>(),
+}) as { enCours: Map<string, Promise<string | null>>; echecs: Map<string, number> };
 const dossierCache = join(tmpdir(), 'outils-carte-meteo');
 /** Version du format des extraits : à changer quand « extraire » évolue (les fichiers des versions précédentes sont purgés). */
 const VERSION_CACHE = 'v25'; // v25 : altitude des points de grille de la pluie (cumul « à X m et moins ») ; // v24 : communes basses (relief « et moins », neige à basse altitude) ; // v23 : pluie de tous les points de grille du département (commune la plus arrosée) ; // v22 : après-midi = 15 h à 18 h, température moyenne ; // v21 : séries au pas de 6 h (CEP au-delà de J+6, AIFS) ramenées au pas de 3 h ; v20 : rafales et vent des villes de vallée = point de plaine voisin (plus celui de la grille en altitude) ; v19 : altitude des villes du département (classement côte / terres / reliefs) ; v18 : communes de relief à 300, 500 et 2 000 m (cartes de risque) ; // v15 : température des villes de montagne ramenée à l'altitude du village (retouches) ; v14 : rafale du département = la plus forte de ses communes de plaine
@@ -207,8 +207,18 @@ async function recuperer(url: string, delaiMs: number): Promise<Response> {
   throw derniere instanceof Error ? derniere : new Error(String(derniere));
 }
 
-/** Lit un fichier d'un modèle sur sa base principale, puis sur la copie du VPS2 si elle existe et que la première échoue. */
-async function recupererModele(modele: ModeleSource, chemin: string, delaiMs: number): Promise<Response> {
+/** Arome sur les Pyrénées-Orientales : le serveur de données (VPS2) reçoit chaque passage avant GitHub, on le lit en premier. */
+const secoursEnPremier = (modele: ModeleSource, dep: string) => modele === 'arome' && dep === '66' && BASES_SECOURS[modele] != null;
+
+/** Lit un fichier d'un modèle sur sa base principale, puis sur la copie du VPS2 si elle existe et que la première échoue (ou l'inverse avec vps2EnPremier). */
+async function recupererModele(modele: ModeleSource, chemin: string, delaiMs: number, vps2EnPremier = false): Promise<Response> {
+  if (vps2EnPremier) {
+    try {
+      return await recuperer(`${BASES_SECOURS[modele]}${chemin}`, delaiMs);
+    } catch {
+      return await recuperer(`${BASES[modele]}${chemin}`, delaiMs);
+    }
+  }
   try {
     return await recuperer(`${BASES[modele]}${chemin}`, delaiMs);
   } catch (e) {
@@ -220,22 +230,23 @@ async function recupererModele(modele: ModeleSource, chemin: string, delaiMs: nu
 }
 
 /** Passage du modèle en cours (run_time de l'index) ; en cas d'échec on garde le dernier connu. */
-export async function passageCourant(modele: ModeleSource): Promise<string | null> {
-  const connu = indexCourant.get(modele);
+export async function passageCourant(modele: ModeleSource, vps2EnPremier = false): Promise<string | null> {
+  const cle = vps2EnPremier ? `${modele}@vps2` : modele;
+  const connu = indexCourant.get(cle);
   if (connu && Date.now() - connu.t < VALIDITE_INDEX_MS) return connu.runTime;
-  const echec = etatIndex.echecs.get(modele);
+  const echec = etatIndex.echecs.get(cle);
   if (echec && Date.now() - echec < 60_000) return connu?.runTime ?? null;
-  const enLecture = etatIndex.enCours.get(modele);
+  const enLecture = etatIndex.enCours.get(cle);
   if (enLecture) return enLecture;
-  const lecture = lirePassageCourant(modele).finally(() => etatIndex.enCours.delete(modele));
-  etatIndex.enCours.set(modele, lecture);
+  const lecture = lirePassageCourant(modele, cle, vps2EnPremier).finally(() => etatIndex.enCours.delete(cle));
+  etatIndex.enCours.set(cle, lecture);
   return lecture;
 }
 
-async function lirePassageCourant(modele: ModeleSource): Promise<string | null> {
-  const connu = indexCourant.get(modele);
+async function lirePassageCourant(modele: ModeleSource, cle: string, vps2EnPremier: boolean): Promise<string | null> {
+  const connu = indexCourant.get(cle);
   try {
-    const reponse = await recupererModele(modele, '/index.json', 15_000);
+    const reponse = await recupererModele(modele, '/index.json', 15_000, vps2EnPremier);
     const index = (await reponse.json()) as { model?: { run_time?: string } | string; model_run?: string; generated_at?: string };
     // Version des données = passage du modèle + date de publication : les pipelines publient d'abord un passage tronqué
     // (ex. GFS sur 5 jours) puis le complètent sous le même run_time ; sans generated_at, le cache gardait la version tronquée.
@@ -243,14 +254,14 @@ async function lirePassageCourant(modele: ModeleSource): Promise<string | null> 
     const passage = typeof index.model === 'object' ? index.model?.run_time : index.model_run;
     const runTime = [passage, index.generated_at].filter(Boolean).join('|') || null;
     if (runTime) {
-      indexCourant.set(modele, { t: Date.now(), runTime });
-      etatIndex.echecs.delete(modele);
+      indexCourant.set(cle, { t: Date.now(), runTime });
+      etatIndex.echecs.delete(cle);
       return runTime;
     }
   } catch (e) {
     console.error('Carte météo : index indisponible', modele, e);
   }
-  etatIndex.echecs.set(modele, Date.now());
+  etatIndex.echecs.set(cle, Date.now());
   return connu?.runTime ?? null;
 }
 
@@ -550,7 +561,8 @@ function extraitDepartement(modele: ModeleSource, dep: string): Promise<Extrait>
 
 async function lireExtraitDepartement(modele: ModeleSource, dep: string): Promise<Extrait> {
   const cle = `${modele}-${dep}-${VERSION_CACHE}`;
-  const runTime = await passageCourant(modele);
+  const vps2 = secoursEnPremier(modele, dep);
+  const runTime = await passageCourant(modele, vps2);
   const enMemoire = memoire.get(cle);
   if (enMemoire && (!runTime || enMemoire.runTime === runTime)) return enMemoire;
   const surDisque = await lireDisque(cle);
@@ -559,7 +571,7 @@ async function lireExtraitDepartement(modele: ModeleSource, dep: string): Promis
     return surDisque;
   }
   try {
-    const reponse = await recupererModele(modele, `/departements/${dep}.json`, 60_000);
+    const reponse = await recupererModele(modele, `/departements/${dep}.json`, 60_000, vps2);
     const brut = (await reponse.json()) as FichierDepartement | FichierIconEu;
     const fichier = 'time' in brut ? await depuisIconEu(brut, dep) : brut;
     const extrait = extraire(dep, fichier, runTime ?? new Date().toISOString());
