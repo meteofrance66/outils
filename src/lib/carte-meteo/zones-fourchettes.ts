@@ -220,14 +220,14 @@ export const texteLocalTheme = (theme: Pick<ThemeInfo, 'decimales' | 'signe' | '
   `loc ${theme.texteValeur ? theme.texteValeur(v) : `${nombreTheme(theme, v, false)}${uniteTheme(theme)}`}`;
 
 /** Picto des cartes en zones (grand, à gauche, et petits sur les grandes zones), selon la nature de la carte. */
-export type PictoZones = 'thermometre' | 'goutte' | 'flocon' | 'vent' | 'eclair' | 'soleil' | 'nuage' | 'brouillard' | 'pression' | 'alerte';
+export type PictoZones = 'thermometre' | 'goutte' | 'verglas' | 'flocon' | 'vent' | 'eclair' | 'soleil' | 'nuage' | 'brouillard' | 'pression' | 'alerte';
 
 export function pictoZones(theme: Pick<ThemeInfo, 'id' | 'unite' | 'groupe' | 'titre'>): PictoZones {
   const id = theme.id;
   const titre = theme.titre.toUpperCase();
   if (/orage/.test(id) || titre.includes('ORAGE')) return 'eclair';
   if (/neige|snow/.test(id) || titre.includes('NEIGE')) return 'flocon';
-  if (/verglas/.test(id)) return 'goutte';
+  if (/verglas/.test(id)) return 'verglas';
   if (/raf|vent|tempete/.test(id) || theme.unite === 'km/h') return 'vent';
   if (/froid|chaleur/.test(id)) return 'thermometre';
   if (/pluie|rr|drias|cumul|intensite/.test(id) || theme.unite === 'mm' || titre.includes('PLUIE')) return 'goutte';

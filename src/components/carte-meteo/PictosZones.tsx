@@ -81,6 +81,29 @@ export function PictoZone({ type, hauteur, couleur, graduations = false }: { typ
       );
       break;
     }
+    case 'verglas': {
+      // Glaçon : cube vu en perspective dont les trois faces (dessus clair, côtés plus ou moins pleins) remplissent la silhouette,
+      // séparées par un filet blanc ; une étincelle blanche sur la face de gauche.
+      const hexagone: [number, number][] = [[50, 7], [88, 28.5], [88, 71.5], [50, 93], [12, 71.5], [12, 28.5]];
+      const centre: [number, number] = [50, 50];
+      const [haut, droiteHaut, droiteBas, bas, gaucheBas, gaucheHaut] = hexagone.map(([x, y]): [number, number] => [50 + (x - 50) * 0.84, 50 + (y - 50) * 0.84]);
+      /** Face réduite vers son centre : le filet blanc qui sépare les faces. */
+      const face = (pts: [number, number][]) => {
+        const cx = pts.reduce((s, q) => s + q[0], 0) / pts.length;
+        const cy = pts.reduce((s, q) => s + q[1], 0) / pts.length;
+        return polygoneRond(pts.map(([x, y]): [number, number] => [cx + (x - cx) * 0.93, cy + (y - cy) * 0.93]), 3);
+      };
+      contenu = (
+        <>
+          <Corps couleur={couleur} w={5} forme={(a) => <path d={polygoneRond(hexagone, 8)} {...a} />} />
+          <path d={face([haut, droiteHaut, centre, gaucheHaut])} fill={couleur} fillOpacity={0.3} />
+          <path d={face([gaucheHaut, centre, bas, gaucheBas])} fill={couleur} />
+          <path d={face([centre, droiteHaut, droiteBas, bas])} fill={couleur} fillOpacity={0.65} />
+          <path d="M33 47Q34.6 55.4 43 57Q34.6 58.6 33 67Q31.4 58.6 23 57Q31.4 55.4 33 47Z" fill={BLANC} />
+        </>
+      );
+      break;
+    }
     case 'flocon': {
       const branche = 'M50 50V11M50 27L40 17M50 27L60 17';
       const rayons = [0, 60, 120, 180, 240, 300];
