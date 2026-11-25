@@ -70,6 +70,8 @@ export interface ThemePrevision extends ThemeInfo {
   modeleImpose?: 'arome' | 'arpege' | 'harmonie';
   /** Fenêtre glissante : pluie des N prochaines heures à partir de maintenant (et non d'un jour entier). */
   fenetreHeures?: number;
+  /** « À partir de maintenant » : de l'instant présent à minuit (fin du jour en cours). */
+  jusquaMinuit?: boolean;
   /** Carte mixte : pluie (mm) en plaine et neige fraîche (cm) sur les communes de montagne (lues à part, ?montagne=1). */
   pluieEtNeige?: boolean;
   /** Cartes de risque, option « chiffres » : valeur brute (km/h, mm, °C…) à la place du niveau, colorée selon les mêmes seuils. */
@@ -475,6 +477,7 @@ const THEMES_PREVISION_BASE: ThemePrevision[] = [
   { id: 'ressenti', groupe: 'Températures', titre: 'TEMPÉRATURES RESSENTIES', court: 'Ressenti (vent)', unite: '°', decimales: 0, paliers: PALIERS_TEMPERATURE, ordre: 'asc', titreTop: 'Les plus froids', valeur: (x) => x.ressentiMin },
   { id: 'amplitude', groupe: 'Températures', titre: 'AMPLITUDE THERMIQUE', court: 'Amplitude (maxi - mini)', unite: '°', decimales: 0, paliers: PALIERS_AMPLITUDE, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => (x.maxi != null && x.mini != null ? x.maxi - x.mini : null) },
   { id: 'pluie', groupe: 'Pluie', titre: 'CUMULS DE PLUIE', court: 'Cumuls de pluie', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => pluieMax(x.pluieJourneeMax, x.pluieJournee) },
+  { id: 'pluie-maintenant', groupe: 'Pluie', jusquaMinuit: true, titre: 'PLUIE À PARTIR DE MAINTENANT JUSQU’À MINUIT', court: 'Pluie à partir de maintenant (jusqu’à minuit)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => pluieMax(x.pluieMinuitMax, x.pluieMinuit) },
   { id: 'pluie-24h', groupe: 'Pluie', fenetreHeures: 24, titre: 'PLUIE DANS LES 24 PROCHAINES HEURES', court: 'Pluie 24 h (prochaines heures)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => pluieMax(x.pluie24hMax, x.pluie24h) },
   { id: 'pluie-36h', groupe: 'Pluie', fenetreHeures: 36, titre: 'PLUIE DANS LES 36 PROCHAINES HEURES', court: 'Pluie 36 h (prochaines heures)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => pluieMax(x.pluie36hMax, x.pluie36h) },
   { id: 'pluie-neige-36h', groupe: 'Pluie', fenetreHeures: 36, pluieEtNeige: true, sansTeinte: true, titre: 'PLUIE ET NEIGE EN MONTAGNE · 36 PROCHAINES HEURES', court: 'Pluie + neige en montagne (36 h)', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => x.pluie36h },
@@ -485,6 +488,7 @@ const THEMES_PREVISION_BASE: ThemePrevision[] = [
   { id: 'pluie-16j', groupe: 'Pluie', cumulJours: 16, titre: 'CUMULS DE PLUIE SUR 16 JOURS', court: 'Pluie sur 16 jours', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => pluieMax(x.pluie16jMax, x.pluie16j) },
   { id: 'pluie-periode', groupe: 'Pluie', periode: true, titre: 'CUMULS DE PLUIE SUR LA PÉRIODE', court: 'Pluie sur une période', unite: 'mm', decimales: 0, paliers: PALIERS_PLUIE_CUMUL, ordre: 'desc', titreTop: 'Les plus arrosés', valeur: (x) => pluieMax(x.pluiePeriodeMax, x.pluiePeriode) },
   { id: 'rafales', groupe: 'Vent', titre: 'RAFALES MAXIMALES', court: 'Rafales maximales', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafaleJournee, direction: (x) => x.directionRafaleJournee },
+  { id: 'rafales-maintenant', groupe: 'Vent', jusquaMinuit: true, titre: 'RAFALES MAXIMALES À PARTIR DE MAINTENANT JUSQU’À MINUIT', court: 'Rafales à partir de maintenant (jusqu’à minuit)', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafaleMinuit, direction: (x) => x.directionRafaleMinuit },
   { id: 'rafales-run', groupe: 'Vent', run: true, titre: 'RAFALES MAXIMALES JUSQU’À LA FIN DU RUN', court: 'Rafales jusqu’à la fin du run (AROME 48 h, Harmonie 60 h)', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafaleRun, direction: (x) => x.directionRafaleRun },
   { id: 'rafales-3j', groupe: 'Vent', cumulJours: 3, titre: 'RAFALES MAXIMALES SUR 3 JOURS', court: 'Rafales sur 3 jours', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafale3j, direction: (x) => x.directionRafale3j },
   { id: 'rafales-5j', groupe: 'Vent', cumulJours: 5, titre: 'RAFALES MAXIMALES SUR 5 JOURS', court: 'Rafales sur 5 jours', unite: 'km/h', decimales: 0, paliers: PALIERS_RAFALES, ordre: 'desc', titreTop: 'Les plus fortes', valeur: (x) => x.rafale5j, direction: (x) => x.directionRafale5j },

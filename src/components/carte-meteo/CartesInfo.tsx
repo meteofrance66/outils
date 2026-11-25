@@ -129,6 +129,13 @@ const fenetreDepuisMaintenant = (heures: number, depuis = Date.now()) => {
   return `DU ${fmt(debut)} H AU ${fmt(debut + heures * 3_600_000)} H`;
 };
 
+/** « DU MAR. 3 NOV. 15 H À MINUIT » : de maintenant (heure de Paris, arrondie à l'heure) à la fin du jour. */
+const depuisMaintenantJusquaMinuit = (depuis = Date.now()) => {
+  const debut = Math.round(depuis / 3_600_000) * 3_600_000;
+  const fmt = new Date(debut).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', timeZone: 'Europe/Paris' }).replace(':00', '').replace(/\s+/g, ' ').replace(/\s*h$/i, '').toUpperCase();
+  return `DU ${fmt} H À MINUIT`;
+};
+
 /** Rubrique de la carte « l'essentiel » à partir d'un thème (prévision ou bilan). */
 const rubrique = (themes: ThemeInfo[], id: string, libelle: string, icone: string, points: Record<string, PointInfo[]>): RubriqueSynthese => ({
   libelle,
@@ -1804,6 +1811,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         sousTitre={
                           ((theme as ThemePrevision).fenetreHeures
                             ? fenetreDepuisMaintenant((theme as ThemePrevision).fenetreHeures!, instantFige)
+                            : (theme as ThemePrevision).jusquaMinuit
+                            ? depuisMaintenantJusquaMinuit(instantFige)
                             : (theme as ThemePrevision).run && infoRun(theme as ThemePrevision).sousTitreRun
                             ? infoRun(theme as ThemePrevision).sousTitreRun!.modele
                             : (theme as ThemePrevision).periode

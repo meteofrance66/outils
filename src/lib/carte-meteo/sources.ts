@@ -6,7 +6,7 @@ import { COORDS_DEPARTEMENTS } from './departements-coords';
 import { DEPARTEMENTS_FR } from './departements-fr';
 import { ALTITUDE_MAX_VILLE_FRANCE, VILLES_FRANCE } from './villes-france';
 import { pictoDepuisPrevision } from './pictos';
-import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pluieJusquaFinDuRun, pluiesMaximales, pointDepuisSerie, rafaleJusquaFinDuRun, type ModeleMeteo, type ModeleSource, type PluiePoints, type PointCarte, type Serie } from './previsions-modeles';
+import { CODES_DEPARTEMENTS, MODELES_MOYENNE, ajouterJours, modeleDisponible, pluieJusquaFinDuRun, pluieJusquaMinuit, pluiesMaximales, pointDepuisSerie, rafaleJusquaFinDuRun, rafaleJusquaMinuit, type ModeleMeteo, type ModeleSource, type PluiePoints, type PointCarte, type Serie } from './previsions-modeles';
 
 /**
  * Prévisions de la carte météo : les paquets départementaux publiés par les pipelines d'alertesmeteo-hub (branche `data`),
@@ -658,6 +658,18 @@ export async function chargerPrevisionsCarteJours(
       // Pluie jusqu'à la fin du run : le cumul le plus élevé du département.
       const cumuls = [r.value.chef, ...r.value.villes.map((v) => v.serie)].map(pluieJusquaFinDuRun).filter((v): v is number => v != null);
       if (cumuls.length) point.pluieRun = Math.max(...cumuls);
+      // À partir de maintenant, jusqu'à minuit : même principe (rafale et pluie les plus fortes du département).
+      let plusForteMinuit: { valeur: number | null; direction: number | null } | null = null;
+      for (const serie of [r.value.chef, ...r.value.villes.map((v) => v.serie)]) {
+        const x = rafaleJusquaMinuit(serie);
+        if (x.valeur != null && (plusForteMinuit == null || x.valeur > (plusForteMinuit.valeur ?? -1))) plusForteMinuit = x;
+      }
+      if (plusForteMinuit) {
+        point.rafaleMinuit = plusForteMinuit.valeur;
+        point.directionRafaleMinuit = plusForteMinuit.direction;
+      }
+      const cumulsMinuit = [r.value.chef, ...r.value.villes.map((v) => v.serie)].map(pluieJusquaMinuit).filter((v): v is number => v != null);
+      if (cumulsMinuit.length) point.pluieMinuit = Math.max(...cumulsMinuit);
       // Cartes de pluie de la France : le cumul de la commune la plus arrosée du département, toutes ses communes comptées.
       if (pluieMax && r.value.pluiePoints) Object.assign(point, pluiesMaximales(r.value.pluiePoints, date, finPeriode, Date.now(), altitudePluie));
       if (finPeriode ? aValeursPeriode(point) : point.tempApresMidi != null || (!apresMidiSeulement && point.maxi != null)) (sortie[date] as PointCarte[]).push(point);

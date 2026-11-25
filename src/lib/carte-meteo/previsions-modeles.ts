@@ -141,6 +141,11 @@ export interface PointCarte {
   directionRafaleRun?: number | null;
   debutRun?: string | null;
   finRun?: string | null;
+  /** « À partir de maintenant » : de l'instant présent à minuit (fin du jour en cours, heure de Paris), pluie cumulée (mm), rafale la plus forte (km/h) et sa direction. */
+  pluieMinuit?: number | null;
+  rafaleMinuit?: number | null;
+  directionRafaleMinuit?: number | null;
+  pluieMinuitMax?: number | null;
   /** Neige fraîche (cm, estimée) dans les 36 prochaines heures. */
   neige36h?: number | null;
   /** Cartes de risque sur 24 h glissantes : rafale max, maxi, mini, orage (code max 0 à 4) et neige (mm) dans les 24 prochaines heures. */
@@ -384,7 +389,12 @@ export interface PluiePoints {
   altitudes?: number[];
 }
 
-export type PluiesMaximales = Pick<PointCarte, 'pluieJourneeMax' | 'pluie24hMax' | 'pluie36hMax' | 'pluiePeriodeMax' | 'pluie3jMax' | 'pluie5jMax' | 'pluie10jMax' | 'pluie16jMax' | 'pluieRun'>;
+export type PluiesMaximales = Pick<PointCarte, 'pluieJourneeMax' | 'pluie24hMax' | 'pluie36hMax' | 'pluiePeriodeMax' | 'pluie3jMax' | 'pluie5jMax' | 'pluie10jMax' | 'pluie16jMax' | 'pluieRun' | 'pluieMinuitMax'>;
+
+/** Prochain minuit à Paris après l'instant `ms` (fin du jour en cours). */
+function minuitSuivantParis(ms: number): number {
+  return minuitParis(ajouterJours(dateHeureParis(new Date(ms).toISOString()).date, 1));
+}
 
 /**
  * Pluie de la commune la plus arrosée d'un département (carte de France par département), pour chaque fenêtre des cartes de
@@ -410,6 +420,7 @@ export function pluiesMaximales(p: PluiePoints, dateISO: string, finPeriode?: st
     ['pluieJourneeMax', debut, minuitParis(ajouterJours(dateISO, 1))],
     ['pluie24hMax', maintenant, maintenant + 24 * heure],
     ['pluie36hMax', maintenant, maintenant + 36 * heure],
+    ['pluieMinuitMax', maintenant, minuitSuivantParis(maintenant)],
     ['pluie3jMax', debut, debut + 3 * jour],
     ['pluie5jMax', debut, debut + 5 * jour],
     ['pluie10jMax', debut, debut + 10 * jour],
@@ -476,6 +487,19 @@ export function pluieJusquaFinDuRun(serie: Serie): number | null {
   return finRun != null && finRun > maintenant ? cumulEntre(serie, maintenant, finRun).valeur : null;
 }
 
+/** Rafale la plus forte (km/h) et sa direction de maintenant à minuit (Paris), pour une série brute (carte de France : maximum du département). */
+export function rafaleJusquaMinuit(brute: Serie): { valeur: number | null; direction: number | null } {
+  const serie: Serie = { ...brute, rafale: brute.rafale.map((v) => (v != null && ventPlausible(v) ? v : null)) };
+  const maintenant = Date.now();
+  return rafaleEntre(serie, maintenant, minuitSuivantParis(maintenant));
+}
+
+/** Pluie cumulée (mm) de maintenant à minuit (Paris), pour une série brute (carte de France : maximum du département). */
+export function pluieJusquaMinuit(serie: Serie): number | null {
+  const maintenant = Date.now();
+  return cumulEntre(serie, maintenant, minuitSuivantParis(maintenant)).valeur;
+}
+
 /** Cumuls de pluie et rafales les plus fortes sur 3, 5, 10 et 16 jours à partir de minuit (Paris) de `dateISO`. */
 function cumulsPluie(
   serie: Serie,
@@ -483,7 +507,7 @@ function cumulsPluie(
 ): Pick<
   PointCarte,
   | 'pluie3j' | 'pluie5j' | 'pluie10j' | 'pluie16j' | 'pluie24h' | 'pluie36h' | 'neige36h' | 'rafale24h' | 'maxi24h' | 'mini24h' | 'orage24h' | 'neige24h' | 'finPrevision'
-  | 'pluieRun' | 'rafaleRun' | 'directionRafaleRun' | 'debutRun' | 'finRun'
+  | 'pluieRun' | 'rafaleRun' | 'directionRafaleRun' | 'debutRun' | 'finRun' | 'pluieMinuit' | 'rafaleMinuit' | 'directionRafaleMinuit'
   | 'rafale3j' | 'rafale5j' | 'rafale10j' | 'rafale16j' | 'directionRafale3j' | 'directionRafale5j' | 'directionRafale10j' | 'directionRafale16j'
 > {
   const debut = minuitParis(dateISO);
@@ -498,6 +522,10 @@ function cumulsPluie(
   const debutRun = finRun != null && finRun > maintenant ? maintenant : null;
   const cRun = debutRun != null && finRun != null ? cumulEntre(serie, debutRun, finRun) : { valeur: null, derniere: null };
   const rRun = debutRun != null && finRun != null ? rafaleEntre(serie, debutRun, finRun) : { valeur: null, direction: null };
+  // À partir de maintenant, jusqu'à minuit (fin du jour en cours).
+  const minuit = minuitSuivantParis(maintenant);
+  const cMinuit = cumulEntre(serie, maintenant, minuit);
+  const rMinuit = rafaleEntre(serie, maintenant, minuit);
   const [c3, c5, c10, c16] = DUREES_CUMUL.map((jours) => cumulEntre(serie, debut, debut + jours * 86_400_000));
   const [r3, r5, r10, r16] = DUREES_CUMUL.map((jours) => rafaleEntre(serie, debut, debut + jours * 86_400_000));
   return {
@@ -514,6 +542,9 @@ function cumulsPluie(
     directionRafaleRun: rRun.direction,
     debutRun: debutRun != null ? new Date(debutRun).toISOString() : null,
     finRun: finRun != null ? new Date(finRun).toISOString() : null,
+    pluieMinuit: cMinuit.valeur,
+    rafaleMinuit: rMinuit.valeur,
+    directionRafaleMinuit: rMinuit.direction,
     pluie3j: c3.valeur,
     pluie5j: c5.valeur,
     pluie10j: c10.valeur,
