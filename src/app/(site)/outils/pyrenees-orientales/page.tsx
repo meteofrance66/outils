@@ -19,6 +19,8 @@ export const metadata: Metadata = {
 };
 
 const MODELES_ANIMATION: ModeleSource[] = ['cep', 'gfs', 'arpege', 'arome'];
+/** Modèles au choix pour la planche par jour : CEP (à 15 jours), GFS (15 jours), ARPEGE (3 jours) et Harmonie KNMI 5,5 km (demain). */
+const MODELES_PLANCHE: ModeleSource[] = ['cep', 'gfs', 'arpege', 'harmonie'];
 const DEPARTEMENT = '66';
 
 export default async function PagePyreneesOrientales({ searchParams }: { searchParams: Promise<{ modele?: string }> }) {
@@ -64,7 +66,7 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
       </div>
 
       <div id="planche" className="mt-12 scroll-mt-4">
-        <PlanchesJours aujourdhui={aujourdhui} modele={{ id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' }} jours={{}} zoneInitiale={`dep:${DEPARTEMENT}`} departInitial={2} logoInitial="pays-catalan-hd" styleInitial="mediterranee-sauge" />
+        <PlanchesJours aujourdhui={aujourdhui} modele={{ id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' }} jours={{}} modelesChoix={MODELES_PLANCHE} zoneInitiale={`dep:${DEPARTEMENT}`} departInitial={2} logoInitial="pays-catalan-hd" styleInitial="mediterranee-sauge" />
       </div>
 
       <h2 id="infos" className="mt-12 scroll-mt-4 text-2xl font-extrabold">
