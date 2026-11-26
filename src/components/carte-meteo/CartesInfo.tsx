@@ -28,6 +28,7 @@ import {
   type ThemePrevision,
 } from '@/lib/carte-meteo/cartes-info';
 import { ARRONDIS_ZONES, ARRONDI_ZONES_DEFAUT } from '@/lib/carte-meteo/lissage-zones';
+import NiveauxRisque from './NiveauxRisque';
 import CarteInfo, { AffichageContexte, type AffichageCarte, type PoliceValeurs, type PointInfo, type RetouchesCarte } from './CarteInfo';
 import { THEMES_CARTE } from '@/lib/carte-meteo/pictos';
 import { LIBELLES_COUCHES, type Couche } from '@/lib/carte-meteo/tuiles';
@@ -1808,6 +1809,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">Chargement de la carte {infosModele(modeleAutre(theme)!).libelle}…</p>
                       )
                     ) : mode === 'prevision' ? (
+                      <>
                       <CarteInfo
                           zonageFin={zonageFin && niveau === 'france'} sansTableau={sansTableau} sansLegende={sansLegende} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                         {...retouchesDe(theme.id)}
@@ -1843,6 +1845,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         contexte={(theme as ThemePrevision).montagne ? `${infoRun(theme as ThemePrevision).contexte}, communes de montagne (point du modèle à ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} m ou ${theme.groupe === GROUPE_RISQUES && sensRelief === 'moins' ? 'moins' : 'plus'})` : infoRun(theme as ThemePrevision).contexte}
                         legendeAltitude={theme.groupe === GROUPE_RISQUES && reliefAlt ? `${reliefAlt.toLocaleString('fr-FR')} m et ${sensRelief === 'moins' ? 'moins' : 'plus'}` : cumulPluieAlt(theme) ? `${pluieAlt.toLocaleString('fr-FR')} m et moins` : ''}
                       />
+                      {theme.groupe === GROUPE_RISQUES && <NiveauxRisque idCarte={theme.id} />}
+                      </>
                     ) : mode === 'bilan' ? (
                       <CarteInfo  sansTableau={sansTableau} sansLegende={sansLegende} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} {...retouchesDe(theme.id)} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
                     ) : (

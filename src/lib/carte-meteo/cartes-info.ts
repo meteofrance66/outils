@@ -860,3 +860,28 @@ export interface ReponseBilans {
   /** Records mensuels (clé « 1 »…« 12 ») et absolus des stations du 66 : valeur et date (AAAA-MM-JJ). */
   recordsStations?: Record<string, { monthly?: Record<string, { tx?: { v: number; d: string }; tn?: { v: number; d: string }; rr24?: { v: number; d: string } }>; absolute?: { tx?: { v: number; d: string }; tn?: { v: number; d: string }; rr24?: { v: number; d: string } } }>;
 }
+
+/** Niveaux des cartes de risque, affichés sous la carte : un tableau par danger (les cartes du jour, de la période et des 24 h partagent les mêmes seuils). */
+export interface NiveauxRisque {
+  /** En-tête de la 2e colonne (la grandeur du seuil). */
+  grandeur: string;
+  /** Faible, modéré, fort, sévère : fourchette de valeurs. */
+  valeurs: [string, string, string, string];
+  note?: string;
+}
+export const NIVEAUX_RISQUE: Record<string, NiveauxRisque> = {
+  'risque-gel': { grandeur: 'Température minimale', valeurs: ['+1 à +3 °C', '0 à -2 °C', '-3 à -5 °C', '-6 °C et moins'] },
+  'risque-froid': { grandeur: 'Température minimale', valeurs: ['0 à -4 °C', '-5 à -9 °C', '-10 à -14 °C', '-15 °C et moins'] },
+  'risque-chaleur': { grandeur: 'Température maximale', valeurs: ['30 à 33 °C', '34 à 37 °C', '38 à 41 °C', '42 °C et plus'] },
+  'risque-pluie': { grandeur: 'Cumul de pluie', valeurs: ['10 à 29 mm', '30 à 59 mm', '60 à 99 mm', '100 mm et plus'] },
+  'risque-vent': { grandeur: 'Rafale maximale', valeurs: ['60 à 79 km/h', '80 à 99 km/h', '100 à 119 km/h', '120 km/h et plus'] },
+  'risque-tempete': { grandeur: 'Rafale maximale', valeurs: ['90 à 94 km/h', '95 à 99 km/h', '100 à 119 km/h', '120 km/h et plus'] },
+  'risque-neige': { grandeur: 'Neige fraîche', valeurs: ['1 à 4 cm', '5 à 14 cm', '15 à 29 cm', '30 cm et plus'] },
+  'risque-verglas': { grandeur: 'Pluie sur sol gelé', valeurs: ['1 à 2 mm', '3 à 7 mm', '8 à 14 mm', '15 mm et plus'], note: 'Pluie avec gel au sol : minimale à 0 °C ou moins, maximale à 3 °C ou moins, sans dominante de neige. Indicatif.' },
+  'risque-orage': { grandeur: 'Indicateur d’orage du modèle', valeurs: ['1', '2', '3', '4'], note: 'Retenu seulement s’il y a des précipitations.' },
+};
+/** Niveaux d'une carte de risque (jour, période ou 24 h), ou null pour une autre carte. */
+export function niveauxDeRisque(idCarte: string): NiveauxRisque | null {
+  const base = idCarte === 'orages' ? 'risque-orage' : idCarte.replace(/-(periode|24h)$/, '');
+  return NIVEAUX_RISQUE[base] ?? null;
+}
