@@ -28,6 +28,7 @@ import TexteSurCarte from './TexteSurCarte';
 import cheminsPictosSauge from '@/lib/carte-meteo/pictos-sauge.json';
 import { GRAISSES_PLANCHE, POLICE_INTER, TYPOS_PLANCHE, contourBlanc, tailleAjustee, texteTemperature, useInterPret, type TypoPlanche } from '@/lib/carte-meteo/typo-planche';
 import { attendreInter } from '@/lib/carte-meteo/styles-tableau';
+import { useBasTransparentPictos } from '@/lib/carte-meteo/marge-picto';
 
 const PICTOS_SAUGE: Record<string, string> = cheminsPictosSauge;
 
@@ -455,6 +456,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
       points: [...ecran].sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, nombre),
     }));
   }, [dates, jours, donneesDep, enDepartement, parQuarts, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail, taillePicto, modeleActif.id, format.h, hauteurJour, risques, seuilRafale, tailleRafale]);
+
+  /** Fichier image du picto d'un point (surcharge manuelle, jeu choisi, version « sauge ») ; undefined : pas de picto. */
+  const sourceImagePicto = (cle: string, p: PointJour): string | undefined => {
+    const pictoId = surcharges[cle] ?? pictoDuJour(p);
+    const chemin = pictoId ? cheminPictoImage(selonJeu(pictoId, jeuAlertes)) ?? '' : undefined;
+    return styleSauge && chemin ? PICTOS_SAUGE[chemin.split('?')[0]] ?? chemin : chemin;
+  };
+  // Vide transparent sous chaque picto, mesuré : la température se place juste sous le dessin.
+  const basTransparent = useBasTransparentPictos(cartes.flatMap((c) => c.points.flatMap(({ p }) => sourceImagePicto(`${c.date}|${p.code}`, p) ?? [])));
 
   /** Lignes du tableau : régions pour la France (moyenne de leurs départements), départements pour une région, villes pour un département. */
   const lignesTableau: LigneTableau[] = useMemo(() => {
@@ -954,24 +964,28 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                     {points.map(({ p, x, y }) => {
                       const cle = `${date}|${p.code}`;
                       const pictoId = surcharges[cle] ?? pictoDuJour(p);
-                      const sourcePicto = pictoId ? cheminPictoImage(selonJeu(pictoId, jeuAlertes)) ?? '' : undefined;
+                      const sourcePicto = sourceImagePicto(cle, p);
                       const dec = decalages[cle];
+                      // Température collée au dessin : on retire le vide transparent sous le picto et l'interligne du texte, en gardant un petit espace.
+                      const tailleTemp = Math.round(taillePicto * 0.36 * (fb && !etroit ? 0.9 : 1));
+                      const remontee = pictoId && sourcePicto ? Math.max(0, Math.round(basTransparent(sourcePicto) * tailleImagePicto + tailleTemp * 0.12 - tailleImagePicto * 0.05)) : 0;
+                      const avecLpn = !!(pictoId && estPictoNeige(pictoId) && lpns[cle]);
                       return (
                       <div key={p.code} style={{ position: 'absolute', left: x, top: y, transform: `${parQuarts ? 'translate(-50%, -50%)' : `translate(-50%, ${-taillePicto / 2}px)`}${dec ? ` translate(${dec[0]}px, ${dec[1]}px)` : ''}`, display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={styleSauge && sourcePicto ? PICTOS_SAUGE[sourcePicto.split('?')[0]] ?? sourcePicto : sourcePicto}
+                          src={sourcePicto}
                           alt=""
                           draggable={false}
                           title="Cliquer pour changer le picto, glisser pour déplacer le picto et ses températures"
                           onPointerDown={(e) => debutPicto(e, cle)}
                           style={{ width: tailleImagePicto, height: tailleImagePicto, marginTop: taillePicto - tailleImagePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
                         />
-                        {pictoId && estPictoNeige(pictoId) && lpns[cle] && (
-                          <span style={{ fontFamily: policeValeurs, fontWeight: fb ? GRAISSES_PLANCHE.libelle : 700, fontSize: Math.max(12, Math.round(taillePicto * 0.22)), color: '#0c4a6e', background: '#f0f9ff', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>LPN : {lpns[cle]} m</span>
+                        {avecLpn && (
+                          <span style={{ marginTop: -remontee, fontFamily: policeValeurs, fontWeight: fb ? GRAISSES_PLANCHE.libelle : 700, fontSize: Math.max(12, Math.round(taillePicto * 0.22)), color: '#0c4a6e', background: '#f0f9ff', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>LPN : {lpns[cle]} m</span>
                         )}
                         {/* Maximale en rouge, minimale en bleu à droite : le « / » n'est plus entouré d'espaces mais d'une petite marge régulière. */}
-                        <span style={{ fontFamily: policeValeurs, fontWeight: fb ? GRAISSES_PLANCHE.maxi : typoModerne ? 800 : undefined, fontVariantNumeric: fb ? 'tabular-nums' : undefined, fontSize: Math.round(taillePicto * 0.36 * (fb && !etroit ? 0.9 : 1)), color: '#d4101a', textShadow: fb ? contourBlanc(Math.round(taillePicto * 0.36 * (fb && !etroit ? 0.9 : 1))) : etroit ? '0 0 3px #fff, 0 0 3px #fff, 0 0 6px rgba(255,255,255,0.9), 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff' : styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: policeValeurs, fontWeight: fb ? GRAISSES_PLANCHE.maxi : typoModerne ? 800 : undefined, fontVariantNumeric: fb ? 'tabular-nums' : undefined, marginTop: avecLpn ? 0 : -remontee, fontSize: tailleTemp, color: '#d4101a', textShadow: fb ? contourBlanc(tailleTemp) : etroit ? '0 0 3px #fff, 0 0 3px #fff, 0 0 6px rgba(255,255,255,0.9), 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff' : styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${fb ? texteTemperature(p.maxi) : Math.round(p.maxi)}°` : ''}
                           {p.mini != null ? (
                             <span style={{ color: '#1f6fe0', fontWeight: fb ? GRAISSES_PLANCHE.mini : undefined, fontSize: fb ? '0.75em' : typoModerne ? '0.8em' : '0.72em' }}>

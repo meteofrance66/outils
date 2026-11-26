@@ -6,7 +6,7 @@ import { COLONNES, uniteEntete } from '@/lib/carte-meteo/colonnes-releves';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { ajouterJours } from '@/lib/carte-meteo/previsions-modeles';
-import { attendreInter, avecTypo, LARGEUR_CAPITALES_INTER, STYLES_TABLEAU, TYPOS_TABLEAU, type StyleTableau, type TypoTableau } from '@/lib/carte-meteo/styles-tableau';
+import { attendreInter, avecTypo, LARGEUR_CAPITALES_INTER, STYLES_TABLEAU, type StyleTableau, type TypoTableau } from '@/lib/carte-meteo/styles-tableau';
 import { lireListeValeurs } from '@/lib/carte-meteo/tab-val';
 import { normaliser } from './CarteMeteo';
 
@@ -63,6 +63,12 @@ const EXEMPLE = `20.9°C à Perpignan - El Vernet
 18°C à Eus
 11.9°C à Targassonne`;
 
+/** Typographies de Tab Val : Inter dans les deux cas ; « Standard » grossit les noms des villes de 15 %, « Facebook » les garde à leur taille. */
+const TYPOS_TAB_VAL: { id: TypoTableau; libelle: string }[] = [
+  { id: 'standard', libelle: 'Standard : Inter, noms des villes +15 %' },
+  { id: 'facebook', libelle: 'Facebook : Inter, lisible sur smartphone' },
+];
+
 export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
   const [texte, setTexte] = useState('');
   const [modeleId, setModeleId] = useState('tx-hier');
@@ -110,7 +116,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
     return () => observateur.disconnect();
   }, []);
 
-  const st: StyleTableau = avecTypo(STYLES_TABLEAU.find((x) => x.id === styleId) ?? STYLES_TABLEAU[0], typo);
+  const st: StyleTableau = avecTypo(STYLES_TABLEAU.find((x) => x.id === styleId) ?? STYLES_TABLEAU[0], 'facebook');
   const modele = MODELES_TAB.find((m) => m.id === modeleId) ?? MODELES_TAB[0];
   const theme: ThemeBilan | undefined = THEMES_BILAN.find((t) => t.id === (modele.themeId || autreId));
   const lecture = useMemo(() => lireListeValeurs(texte), [texte]);
@@ -155,7 +161,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
     setEnExport(true);
     try {
       if (st.typo) await attendreInter();
-      await exporterEnJpg(planchRef.current, `tab-val-${modele.id === 'autre' ? autreId : modele.id}-${st.id}-${normaliser(lieu).replace(/ /g, '-')}-${aujourdhui}${st.typo ? '-facebook' : ''}`, LARGEUR, hauteur, st.fond.startsWith('#') ? st.fond : undefined);
+      await exporterEnJpg(planchRef.current, `tab-val-${modele.id === 'autre' ? autreId : modele.id}-${st.id}-${normaliser(lieu).replace(/ /g, '-')}-${aujourdhui}${typo === 'facebook' ? '-facebook' : ''}`, LARGEUR, hauteur, st.fond.startsWith('#') ? st.fond : undefined);
     } catch (e) {
       console.error('Export du tableau Tab Val en JPG', e);
       setErreurExport("L'export a échoué. Réessayez dans un instant.");
@@ -344,7 +350,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
 
           <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Typographie">
             <span className="text-sm font-medium">Typographie :</span>
-            {TYPOS_TABLEAU.map((t) => (
+            {TYPOS_TAB_VAL.map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -404,7 +410,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
                       {avecRang && (
                         <div style={{ width: 52, flexShrink: 0, fontFamily: st.policeValeur, fontSize: 24, color: st.accent, fontStyle: st.rangItalique ? 'italic' : undefined, fontVariantNumeric: 'tabular-nums', fontWeight: st.typo?.valeur }}>{i + 1}</div>
                       )}
-                      <div style={{ flex: 1, minWidth: 0, fontSize: st.typo ? 24 : 26.4, fontWeight: st.typo?.nom ?? 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: typo === 'standard' ? 24 * 1.15 : 24, fontWeight: st.typo?.nom ?? 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}</div>
                       <div style={{ width: largeurMesure, display: 'flex', justifyContent: 'center' }}>{valeurDe(l.valeur)}</div>
                     </div>
                   ))}
