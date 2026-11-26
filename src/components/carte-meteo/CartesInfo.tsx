@@ -1823,6 +1823,8 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                               : theme.id === 'risque-froid-periode' || theme.id === 'risque-gel-periode' ? `NUIT ${sousTitrePeriode}` : sousTitrePeriode
                             : (theme as ThemePrevision).montagne
                               ? `${libelleJour(dateISO)} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET ${theme.groupe === GROUPE_RISQUES && sensRelief === 'moins' ? 'MOINS' : 'PLUS'}`
+                              : theme.id === 'risque-gel'
+                              ? libelleJour(dateISO).replace(/^(\S+)/, '$1 MATIN')
                               : libelleJour(dateISO)) +
                           // Carte de risque sans aucune zone concernée : on l'écrit, plutôt que de laisser une carte qui paraît vide.
                           (theme.groupe === GROUPE_RISQUES && (pointsPrevision[theme.id] ?? []).length > 0 && (pointsPrevision[theme.id] ?? []).every((q) => q.valeur === 0) ? ' · AUCUN RISQUE PRÉVU' : '') +
