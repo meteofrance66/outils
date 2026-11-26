@@ -18,6 +18,8 @@ export interface Palier {
   neutre?: boolean;
   /** Mot du niveau en rouge (pastille sur fond blanc, légende), le fond des zones restant celui du palier. */
   libelleRouge?: boolean;
+  /** Seulement le mot de la légende en rouge (carte en chiffres : les valeurs gardent leurs couleurs). */
+  legendeRouge?: boolean;
 }
 
 export interface ThemeInfo {
@@ -560,8 +562,8 @@ const PALIERS_FROID_CHIFFRES: Palier[] = [
 const PALIERS_GEL_CHIFFRES: Palier[] = [
   p(3.5, '#e5e7eb', NOIR, 'Pas de risque (≥ 4 °C)', true),
   p(0.5, '#8ec8ff', NOIR, 'Faible (+1 à +3 °C)'),
-  { ...p(-2.5, '#2f9bff', BLANC, 'Modéré (0 à -2 °C)'), libelleRouge: true },
-  { ...p(-5.5, '#1a4fc4', BLANC, 'Fort (-3 à -5 °C)'), libelleRouge: true },
+  { ...p(-2.5, '#2f9bff', BLANC, 'Modéré (0 à -2 °C)'), legendeRouge: true },
+  { ...p(-5.5, '#1a4fc4', BLANC, 'Fort (-3 à -5 °C)'), legendeRouge: true },
   p(-Infinity, '#0a1a5c', BLANC, 'Sévère (≤ -6 °C)'),
 ];
 const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => {

@@ -1085,7 +1085,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
           <div className="cinfo-encadre-titre">{theme.unite && theme.unite !== '°' && !theme.texteValeur ? `Légende (${theme.unite})` : 'Légende'}</div>
           <ul>
             {legende.map((x) => (
-              <li key={x.libelle} style={x.libelleRouge ? { color: '#e5191e', fontWeight: 800 } : undefined}>
+              <li key={x.libelle} style={x.libelleRouge || x.legendeRouge ? { color: '#e5191e', fontWeight: 800 } : undefined}>
                 <i style={{ background: x.fond }} />
                 {x.libelle}
               </li>
