@@ -108,7 +108,7 @@ export function avecTypo(st: StyleTableau, typo: TypoTableau): StyleTableau {
 /** Attend les graisses d'Inter avant un export (l'image doit être figée avec la bonne police) ; sans erreur si elle est indisponible : la police de secours prend le relais. */
 export async function attendreInter(): Promise<void> {
   try {
-    await Promise.all([600, 700, 800].map((graisse) => document.fonts.load(`${graisse} 24px "Inter Meteo"`)));
+    await Promise.all([500, 600, 700, 800].map((graisse) => document.fonts.load(`${graisse} 24px "Inter Meteo"`)));
   } catch {
     // police locale indisponible : police de secours de POLICE_INTER
   }

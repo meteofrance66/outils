@@ -26,6 +26,8 @@ import { BOITE_FRANCE, codesDeLaZone, normaliser, useContours, useFleuves, FICHI
 import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import TexteSurCarte from './TexteSurCarte';
 import cheminsPictosSauge from '@/lib/carte-meteo/pictos-sauge.json';
+import { GRAISSES_PLANCHE, POLICE_INTER, TYPOS_PLANCHE, contourBlanc, tailleAjustee, texteTemperature, useInterPret, type TypoPlanche } from '@/lib/carte-meteo/typo-planche';
+import { attendreInter } from '@/lib/carte-meteo/styles-tableau';
 
 const PICTOS_SAUGE: Record<string, string> = cheminsPictosSauge;
 
@@ -104,6 +106,13 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [modeleId, setModeleId] = useState<string>(modele.id);
   const [formatChoisi, setFormatChoisi] = useState<FormatPlanche>(formatInitial);
   const format = FORMATS_PLANCHE[formatChoisi];
+  /** Typographie « Facebook » : Inter partout (titres, températures, mentions), pensée pour la lecture sur smartphone. */
+  const [typo, setTypo] = useState<TypoPlanche>('standard');
+  const fb = typo === 'facebook';
+  const interPret = useInterPret(fb);
+  /** Largeur utile (px) du cadre du titre, mesurée : le titre et le sous-titre s'y ajustent. */
+  const [largeurBoiteTitre, setLargeurBoiteTitre] = useState(0);
+  const boiteTitreRef = useRef<HTMLDivElement>(null);
   const LARGEUR: number = format.l;
   /** Format étroit (vertical ou carré, lu sur téléphone) : en-tête plus haut, titre sur deux lignes, textes très grands. */
   const etroit = LARGEUR < 1300;
@@ -171,7 +180,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const lignesTitre = !avecTitre ? 0 : etroit && avecZoneTitre ? 2 : 1;
   const momentAffiche = periode !== 'journee';
   const tailleSousTitre = avecTitre ? tx.sous : tx.sousSeul;
-  const lignesSousTitre = avecDatesTitre || momentAffiche ? ((avecDatesTitre ? 40 : 0) + (momentAffiche ? 18 : 0)) * tailleSousTitre * 0.43 > 800 ? 2 : 1 : 0;
+  // Inter est plus large qu'Impact : le sous-titre passe plus tôt sur deux lignes.
+  const lignesSousTitre = avecDatesTitre || momentAffiche ? ((avecDatesTitre ? 40 : 0) + (momentAffiche ? 18 : 0)) * tailleSousTitre * (fb ? 0.58 : 0.43) > 800 ? 2 : 1 : 0;
   const tailleTitre = etroit && lignesTitre === 1 ? tx.titre * 1.2 : tx.titre;
   const hauteurTitre = etroit ? Math.max(tx.hTitre, Math.round(40 + lignesTitre * tailleTitre * 1.08 + lignesSousTitre * tailleSousTitre * 1.15 + (lignesTitre && lignesSousTitre ? 6 : 0))) : tx.hTitre;
   const [logoId, setLogoId] = useState(logoInitial);
@@ -244,6 +254,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
     return () => o.disconnect();
   }, [LARGEUR]);
 
+  // Largeur utile du cadre du titre (hors marges intérieures) : sert à ajuster la taille des textes en Inter.
+  useEffect(() => {
+    const b = boiteTitreRef.current;
+    if (!b || !fb) return;
+    const o = new ResizeObserver((entrees) => setLargeurBoiteTitre(entrees[0].contentRect.width));
+    o.observe(b);
+    return () => o.disconnect();
+  }, [fb, LARGEUR, avecTitre, avecDatesTitre, periode, logoId]);
+
   const enDepartement = zone.startsWith('dep:');
   /** France en quatre quarts (NO, NE, SO, SE) : un seul picto et la moyenne par quart. */
   const parQuarts = zone === 'quarts' || (zone === 'france' && niveauDetail === NIVEAU_QUATRE_PICTOS);
@@ -286,8 +305,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [styleFond, setStyleFond] = useState<StyleFond | null>(styleInitial ?? (fondCarteMeteo ? null : 'rouge-or'));
   const typoModerne = styleFond === 'mediterranee-sauge-typo';
   const styleSauge = styleFond === 'mediterranee-sauge' || typoModerne;
-  const policeTitres = typoModerne ? "'Barlow Condensed Meteo', sans-serif" : POLICE;
-  const policeValeurs = typoModerne ? "'Montserrat Meteo', sans-serif" : POLICE;
+  const policeTitres = fb ? POLICE_INTER : typoModerne ? "'Barlow Condensed Meteo', sans-serif" : POLICE;
+  const policeValeurs = fb ? POLICE_INTER : typoModerne ? "'Montserrat Meteo', sans-serif" : POLICE;
+  /** Cadres du titre et bandeaux des jours en bleu marine (texte clair) : style sauge, ou typographie Facebook (titres en blanc pur sur tous les styles). */
+  const bandeauSombre = styleSauge || fb;
   const terresEurope = useTerres(styleFond != null);
   const fin = zonageFin && zone === 'france' && !parQuarts;
   type PointZone = { dep: string; lat: number; lon: number; maxi: number | null };
@@ -497,6 +518,23 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   // Titre sans la zone quand elle est masquée ; ligne sous le titre : les dates, ou seulement le moment de la journée (« APRÈS-MIDI ») si les dates sont masquées.
   const titreCarte = avecZoneTitre ? titre : weekEnd ? 'MÉTÉO DU WEEK-END' : `TENDANCE SUR ${duree} JOURS`;
   const sousAffiche = avecDatesTitre ? sousTitreCarte : moment.replace(/^ · /, '');
+  // Typographie Facebook : Inter, plus large qu'Impact. Les tailles se réduisent d'elles-mêmes (jamais de lettres écrasées) pour que rien ne déborde.
+  const lignesTitreTexte = etroit && titreCarte.includes(' : ') ? [`${titreCarte.split(' : ')[0]} :`, titreCarte.split(' : ').slice(1).join(' : ')] : [titreCarte];
+  const tailleTitreFb = useMemo(
+    () => (fb ? tailleAjustee(lignesTitreTexte, GRAISSES_PLANCHE.titre, tailleTitre, largeurBoiteTitre, 0.55, 0.01) : tailleTitre),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fb, interPret, titreCarte, etroit, tailleTitre, largeurBoiteTitre]
+  );
+  const sousSurUneLigne = !etroit || lignesSousTitre < 2;
+  const tailleSousFb = useMemo(
+    () => (fb && sousSurUneLigne ? tailleAjustee([sousAffiche], GRAISSES_PLANCHE.sousTitre, tailleSousTitre, largeurBoiteTitre, 0.6, 0.005) : tailleSousTitre),
+    [fb, interPret, sousAffiche, sousSurUneLigne, tailleSousTitre, largeurBoiteTitre]
+  );
+  const tailleJourBase = etroit ? Math.round(Math.max(22, Math.min(tx.jour + 4, largeurCarte * 0.078))) : (typoModerne ? 24 : 22) * (LARGEUR / 1600);
+  const tailleJour = useMemo(
+    () => (fb ? tailleAjustee(dates.map(jourLibelle), GRAISSES_PLANCHE.jour, tailleJourBase, largeurCarte - 24, 0.6, 0.02) : tailleJourBase),
+    [fb, interPret, dates, tailleJourBase, largeurCarte]
+  );
 
   async function exporterTableau() {
     const noeud = tableauRef.current;
@@ -524,7 +562,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
         ]);
         if (polices.some((liste) => liste.length === 0)) throw new Error('Polices de la carte indisponibles');
       }
-      await exporterEnJpg(planchRef.current, `${weekEnd ? 'week-end' : `tendance-${duree}-jours${depart ? `-des-j${depart}` : ''}`}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modeleActif.id}${formatChoisi === 'paysage' ? '' : `-${formatChoisi}`}`, LARGEUR, hauteur);
+      if (fb) await attendreInter();
+      await exporterEnJpg(planchRef.current, `${weekEnd ? 'week-end' : `tendance-${duree}-jours${depart ? `-des-j${depart}` : ''}`}-${normaliser(nomZone).replace(/ /g, '-')}-${aujourdhui}-${modeleActif.id}${formatChoisi === 'paysage' ? '' : `-${formatChoisi}`}${fb ? '-inter' : ''}`, LARGEUR, hauteur);
     } catch (e) {
       console.error('Export de la planche en JPG', e);
       setErreur("L'export a échoué. Réessayez dans un instant.");
@@ -581,6 +620,20 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
             className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${id === formatChoisi ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
           >
             {FORMATS_PLANCHE[id].libelle}
+          </button>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Typographie">
+        <span className="text-sm font-semibold">Typographie :</span>
+        {TYPOS_PLANCHE.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            aria-pressed={t.id === typo}
+            onClick={() => setTypo(t.id)}
+            className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${t.id === typo ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+          >
+            {t.libelle}
           </button>
         ))}
       </div>
@@ -770,8 +823,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
               transformOrigin: 'top left',
               background: styleSauge ? '#102F4C' : 'linear-gradient(160deg, #0b2a4a 0%, #123c6b 100%)',
               color: '#fff',
-              fontFamily: typoModerne ? policeValeurs : 'Arial, Helvetica, sans-serif',
-              fontWeight: typoModerne ? 600 : 400,
+              fontFamily: typoModerne || fb ? policeValeurs : 'Arial, Helvetica, sans-serif',
+              fontWeight: fb ? GRAISSES_PLANCHE.source : typoModerne ? 600 : 400,
+              // Inter dans sa version « texte » : lettres plus ouvertes, plus lisibles quand l'image est réduite.
+              fontOpticalSizing: fb ? 'none' : undefined,
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -782,12 +837,19 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                 <img src={logo.fichier} alt="" style={{ height: zoneCarte === 'dep:66' ? tx.logo * 1.15 : tx.logo, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
               ) : null}
               {(avecTitre || sousAffiche) && (
-                <div style={{ background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
-                  {avecTitre && <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 800 : undefined, letterSpacing: typoModerne ? -0.5 : undefined, fontSize: tailleTitre, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: etroit ? 'normal' : 'nowrap', overflow: 'hidden' }}>
-                    {/* Formats étroits : retour à la ligne après « : » (sinon la coupure tombait sur le trait d'union de « Pyrénées-Orientales »). */}
-                    {etroit && titreCarte.includes(' : ') ? <>{titreCarte.split(' : ')[0]} :<br />{titreCarte.split(' : ').slice(1).join(' : ')}</> : titreCarte}
-                  </div>}
-                  {sousAffiche && <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 600 : undefined, fontSize: tailleSousTitre, lineHeight: etroit ? 1.1 : undefined, color: styleSauge ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousAffiche}</div>}
+                <div ref={boiteTitreRef} style={{ background: bandeauSombre ? '#102F4C' : 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
+                  {avecTitre && (fb ? (
+                    // Titre en blanc pur, Inter ExtraBold ; chaque ligne reste entière, la taille s'ajuste à la largeur du cadre.
+                    <div style={{ fontFamily: policeTitres, fontWeight: GRAISSES_PLANCHE.titre, letterSpacing: '0.01em', fontSize: tailleTitreFb, lineHeight: 1.08, color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                      {lignesTitreTexte.map((ligne) => <div key={ligne}>{ligne}</div>)}
+                    </div>
+                  ) : (
+                    <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 800 : undefined, letterSpacing: typoModerne ? -0.5 : undefined, fontSize: tailleTitre, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: etroit ? 'normal' : 'nowrap', overflow: 'hidden' }}>
+                      {/* Formats étroits : retour à la ligne après « : » (sinon la coupure tombait sur le trait d'union de « Pyrénées-Orientales »). */}
+                      {etroit && titreCarte.includes(' : ') ? <>{titreCarte.split(' : ')[0]} :<br />{titreCarte.split(' : ').slice(1).join(' : ')}</> : titreCarte}
+                    </div>
+                  ))}
+                  {sousAffiche && <div style={{ fontFamily: policeTitres, fontWeight: fb ? GRAISSES_PLANCHE.sousTitre : typoModerne ? 600 : undefined, letterSpacing: fb ? '0.005em' : undefined, fontSize: fb ? tailleSousFb : tailleSousTitre, lineHeight: etroit ? 1.1 : undefined, color: bandeauSombre ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0, whiteSpace: fb && sousSurUneLigne ? 'nowrap' : undefined, overflow: fb && sousSurUneLigne ? 'hidden' : undefined }}>{sousAffiche}</div>}
                 </div>
               )}
             </div>
@@ -871,19 +933,20 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                       </g>
                     </svg>
                     {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={null} bandes={false} />}
-                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: hauteurJour, background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', color: styleSauge ? '#FFF0D2' : '#0b2a4a', fontFamily: policeTitres, fontWeight: typoModerne ? 700 : undefined, fontSize: etroit ? Math.round(Math.max(22, Math.min(tx.jour + 4, largeurCarte * 0.078))) : (typoModerne ? 24 : 22) * (LARGEUR / 1600), display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: hauteurJour, background: bandeauSombre ? '#102F4C' : 'rgba(255,255,255,0.94)', color: fb ? '#FFFFFF' : styleSauge ? '#FFF0D2' : '#0b2a4a', fontFamily: policeTitres, fontWeight: fb ? GRAISSES_PLANCHE.jour : typoModerne ? 700 : undefined, fontSize: tailleJour, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: fb ? '0.02em' : 0.5, whiteSpace: 'nowrap' }}>
                       {jourLibelle(date)}
                     </div>
                     {styleSauge && zoneCarte === 'dep:66' && (() => {
                       // Mentions « ESPAGNE » et « MER MÉDITERRANÉE » : lisibles sur téléphone, sans dépasser sur le bandeau du jour.
-                      const taillePays = etroit ? Math.max(16, Math.min(30, largeurCarte * 0.03, ((hauteurCarte - hauteurJour) * 0.8) / 10)) : Math.max(10, Math.min(16, largeurCarte * 0.027));
+                      // Inter est plus large qu'Arial : « MER MÉDITERRANÉE » (vertical) occupe environ 12 fois la taille au lieu de 10.
+                      const taillePays = etroit ? Math.max(16, Math.min(30, largeurCarte * 0.03, ((hauteurCarte - hauteurJour) * 0.8) / (fb ? 12.5 : 10))) : Math.max(10, Math.min(fb ? 15 : 16, largeurCarte * (fb ? 0.024 : 0.027)));
                       const yMer = etroit ? hauteurJour + (hauteurCarte - hauteurJour) * 0.5 : hauteurCarte * 0.4;
                       const xMer = largeurCarte - (etroit ? 24 : 20);
                       return (
                         <svg width={largeurCarte} height={hauteurCarte} aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                          <g fontFamily={typoModerne ? policeValeurs : "Arial, Helvetica, sans-serif"} fontSize={taillePays} fontWeight={600} letterSpacing={1.5} textAnchor="middle">
+                          <g fontFamily={typoModerne || fb ? policeValeurs : "Arial, Helvetica, sans-serif"} fontSize={taillePays} fontWeight={fb ? GRAISSES_PLANCHE.geo : 600} letterSpacing={fb ? 1 : 1.5} textAnchor="middle" style={fb ? { fontOpticalSizing: 'none' } : undefined}>
                             <text x={largeurCarte * 0.48} y={hauteurCarte - (etroit ? 20 : 16)} fill="#52634F" opacity={0.85}>ESPAGNE</text>
-                            {avecMer && <text x={xMer} y={yMer} transform={`rotate(-90 ${xMer} ${yMer})`} fill="#EAF3F8" opacity={0.85} letterSpacing={typoModerne ? 0.5 : 1.5}>MER MÉDITERRANÉE</text>}
+                            {avecMer && <text x={xMer} y={yMer} transform={`rotate(-90 ${xMer} ${yMer})`} fill="#EAF3F8" opacity={0.85} letterSpacing={fb ? 0.6 : typoModerne ? 0.5 : 1.5}>MER MÉDITERRANÉE</text>}
                           </g>
                         </svg>
                       );
@@ -905,32 +968,39 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           style={{ width: tailleImagePicto, height: tailleImagePicto, marginTop: taillePicto - tailleImagePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
                         />
                         {pictoId && estPictoNeige(pictoId) && lpns[cle] && (
-                          <span style={{ fontFamily: policeValeurs, fontWeight: 700, fontSize: Math.max(12, Math.round(taillePicto * 0.22)), color: '#0c4a6e', background: '#f0f9ff', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>LPN : {lpns[cle]} m</span>
+                          <span style={{ fontFamily: policeValeurs, fontWeight: fb ? GRAISSES_PLANCHE.libelle : 700, fontSize: Math.max(12, Math.round(taillePicto * 0.22)), color: '#0c4a6e', background: '#f0f9ff', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>LPN : {lpns[cle]} m</span>
                         )}
-                        <span style={{ fontFamily: policeValeurs, fontWeight: typoModerne ? 800 : undefined, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: etroit ? '0 0 3px #fff, 0 0 3px #fff, 0 0 6px rgba(255,255,255,0.9), 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff' : styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
-                          {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
-                          {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: typoModerne ? '0.8em' : '0.72em' }}>{p.maxi != null ? ' / ' : ''}{Math.round(p.mini)}°</span> : null}
+                        {/* Maximale en rouge, minimale en bleu à droite : le « / » n'est plus entouré d'espaces mais d'une petite marge régulière. */}
+                        <span style={{ fontFamily: policeValeurs, fontWeight: fb ? GRAISSES_PLANCHE.maxi : typoModerne ? 800 : undefined, fontVariantNumeric: fb ? 'tabular-nums' : undefined, fontSize: Math.round(taillePicto * 0.36 * (fb && !etroit ? 0.9 : 1)), color: '#d4101a', textShadow: fb ? contourBlanc(Math.round(taillePicto * 0.36 * (fb && !etroit ? 0.9 : 1))) : etroit ? '0 0 3px #fff, 0 0 3px #fff, 0 0 6px rgba(255,255,255,0.9), 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff' : styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
+                          {p.maxi != null ? `${fb ? texteTemperature(p.maxi) : Math.round(p.maxi)}°` : ''}
+                          {p.mini != null ? (
+                            <span style={{ color: '#1f6fe0', fontWeight: fb ? GRAISSES_PLANCHE.mini : undefined, fontSize: fb ? '0.75em' : typoModerne ? '0.8em' : '0.72em' }}>
+                              {p.maxi != null ? <span style={{ fontWeight: fb ? GRAISSES_PLANCHE.separateur : undefined, margin: fb ? '0 0.05em 0 0.03em' : '0 0.08em 0 0.04em' }}>/</span> : null}
+                              {fb ? texteTemperature(p.mini) : Math.round(p.mini)}°
+                            </span>
+                          ) : null}
                         </span>
                         {p.rafale != null && p.rafale >= seuilRafale && (() => {
                           const kmh = Math.round(p.rafale / 5) * 5;
                           const c = couleurRafale(kmh);
                           const angle = angleFleche(p.direction);
                           return (
-                            <span style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4, background: c.fond, color: c.texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 8px', fontFamily: policeTitres, fontSize: Math.round(taillePicto * 0.42 * (tailleRafale / 100)), whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                            <span style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4, background: c.fond, color: c.texte, border: '2px solid #fff', borderRadius: 999, padding: '1px 8px', fontFamily: policeTitres, fontWeight: fb ? GRAISSES_PLANCHE.pastille : undefined, fontVariantNumeric: fb ? 'tabular-nums' : undefined, fontSize: Math.round(taillePicto * 0.42 * (tailleRafale / 100) * (fb ? 0.88 : 1)), whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
                               {angle != null && (
                                 <svg viewBox="-12 -12 24 24" width={Math.round(taillePicto * 0.42 * (tailleRafale / 100))} height={Math.round(taillePicto * 0.42 * (tailleRafale / 100))} aria-hidden>
                                   <path d="M0 -11 L8.5 0 L3.4 0 L3.4 11 L-3.4 11 L-3.4 0 L-8.5 0 Z" fill={c.texte} transform={`rotate(${angle})`} />
                                 </svg>
                               )}
                               {kmh}
-                              <span style={{ fontSize: '0.6em' }}>km/h</span>
+                              <span style={{ fontSize: '0.6em', fontWeight: fb ? GRAISSES_PLANCHE.geo : undefined }}>km/h</span>
                             </span>
                           );
                         })()}
                         {risques && (() => {
-                          const t = Math.round(taillePicto * 0.36);
+                          // Inter étant plus large qu'Impact, les libellés (« ORAGE MODÉRÉ ») sont un peu réduits pour garder l'encombrement d'origine.
+                          const t = Math.round(taillePicto * 0.36 * (fb ? 0.85 : 1));
                           const pastille = (fond: string, texte: string, icone: React.ReactNode, libelle: string) => (
-                            <span key={libelle} style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3, background: fond, color: texte, border: '2px solid #fff', borderRadius: 999, padding: '0 7px', fontFamily: policeTitres, fontSize: t, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                            <span key={libelle} style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3, background: fond, color: texte, border: '2px solid #fff', borderRadius: 999, padding: '0 7px', fontFamily: policeTitres, fontWeight: fb ? GRAISSES_PLANCHE.pastille : undefined, fontSize: t, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
                               <svg viewBox="-12 -12 24 24" width={t} height={t} aria-hidden>{icone}</svg>
                               {libelle}
                             </span>
@@ -960,7 +1030,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                     {premier == null && (!charge || vide) && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 20 }}>
                         {/* Pastille sombre : le message restait illisible sur le fond clair du département. */}
-                        <span style={{ background: 'rgba(11,42,74,0.88)', color: '#fff', fontSize: etroit ? 34 : Math.round(18 * (LARGEUR / 1600)), lineHeight: 1.2, padding: etroit ? '12px 24px' : '8px 16px', borderRadius: 12, border: '2px solid rgba(255,255,255,0.7)' }}>
+                        <span style={{ background: 'rgba(11,42,74,0.88)', color: '#fff', fontSize: etroit ? 34 : Math.round(18 * (LARGEUR / 1600)), lineHeight: 1.2, fontWeight: fb ? GRAISSES_PLANCHE.message : undefined, padding: etroit ? '12px 24px' : '8px 16px', borderRadius: 12, border: '2px solid rgba(255,255,255,0.7)' }}>
                           {!charge ? 'Chargement…' : 'Pas encore de prévision pour ce jour'}
                         </span>
                       </div>
@@ -971,10 +1041,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
             </div>
 
             <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: hauteurPied, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${MARGE}px`, gap: 16, fontSize: tx.pied, lineHeight: etroit ? 1.25 : undefined, color: '#cfe3fa' }}>
-              <span>
+              <span style={{ minWidth: 0, fontWeight: fb ? GRAISSES_PLANCHE.source : undefined }}>
                 Prévisions {modeleActif.libelle} ({modeleActif.fournisseur}){runTexte ? ` · modèle du ${runTexte}` : ''}{couche ? ` · Fond : ${CREDITS_COUCHES[couche]}` : ''}
               </span>
-              <span style={{ fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>Carte élaborée le : {dateElaboree}</span>
+              <span style={{ fontWeight: fb ? GRAISSES_PLANCHE.elaboration : 700, color: '#fff', whiteSpace: 'nowrap' }}>Carte élaborée le : {dateElaboree}</span>
             </div>
           </div>
         </div>
