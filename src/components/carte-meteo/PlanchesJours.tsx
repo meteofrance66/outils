@@ -352,12 +352,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const merVisible = useMemo(() => (styleFond ? positionMer(terresEurope, vue, largeurCarte, hauteurCarte) : null), [styleFond, terresEurope, vue, largeurCarte, hauteurCarte]);
 
   const partDetail = niveauDetail === NIVEAU_QUATRE_PICTOS ? 0.22 : (NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1);
-  const tailleBase = Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) * (parQuarts ? 2.6 : 1) * (tailleIcones / 100);
+  // Format imposé : la carte du territoire garde ses proportions dans le cadre et n'en occupe qu'une partie ; pictos et nombre de points suivent
+  // la largeur réellement utilisée par le territoire (même proportion que la planche paysage), sinon ils se chevauchent et cachent les températures.
+  const largeurUtile = format.h === 0 ? largeurCarte : Math.min(largeurCarte, (hauteurCarte - HAUTEUR_JOUR) * rapportCarte);
+  const tailleBase = (format.h === 0 ? Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) : Math.max(20, Math.min(54, Math.round(largeurUtile * 0.07)))) * (parQuarts ? 2.6 : 1) * (tailleIcones / 100);
   // Moins il y a de points, plus les pictos grossissent (jusqu'à environ deux fois au niveau 4).
   const taillePicto = tailleBase * (parQuarts ? 1 : 1 / Math.sqrt(partDetail));
   const tailleImagePicto = taillePicto * (zoneCarte === 'dep:66' && !weekEnd && (duree === 2 || duree === 4) ? 2 : 1);
   /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
-  const nombreMax = Math.max(3, Math.floor((largeurCarte / (tailleBase * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
+  const nombreMax = Math.max(3, Math.floor((largeurUtile / (tailleBase * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
 
   /** Points de chaque jour, dans la zone, répartis sur la carte (les premiers sont toujours bien espacés). */
   const cartes = useMemo(() => {
