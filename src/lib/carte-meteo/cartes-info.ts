@@ -445,6 +445,8 @@ const PALIERS_RISQUE_GEL: Palier[] = [
   p(1, '#2f9bff', BLANC, 'Faible'),
   p(-Infinity, '#e5e7eb', NOIR, 'Pas de risque', true),
 ];
+/** Carte « Risque de gel » : températures minimales (°C) de chaque niveau (faible, modéré, fort, sévère). */
+const SEUILS_GEL: [number, number, number, number] = [0, -3, -6, -10];
 /** Nombre de seuils atteints (0 à 4), du plus bas au plus haut ; `bas` : on compte les valeurs inférieures ou égales aux seuils. */
 const niveauSeuils = (v: number | null | undefined, seuils: [number, number, number, number], bas = false): number | null =>
   v == null || !Number.isFinite(v) ? null : seuils.filter((s) => (bas ? v <= s : v >= s)).length;
@@ -498,6 +500,7 @@ const THEMES_PREVISION_BASE: ThemePrevision[] = [
   { id: 'vent', groupe: 'Vent', titre: 'VENT MOYEN MAXIMAL', court: 'Vent moyen', unite: 'km/h', decimales: 0, paliers: PALIERS_VENT_MOYEN, ordre: 'desc', titreTop: 'Les plus ventés', valeur: (x) => x.ventMaxJournee },
   { id: 'orages', groupe: 'Risques', titre: 'RISQUE D’ORAGE', court: 'Risque d’orage', unite: '', decimales: 0, paliers: PALIERS_ORAGE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => x.orageJournee, texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-froid', groupe: 'Risques', titre: 'RISQUE DE FROID ET DE GEL', court: 'Risque de froid et de gel', unite: '', decimales: 0, paliers: PALIERS_RISQUE_GEL, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.mini, [0, -5, -10, -15], true), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
+  { id: 'risque-gel', groupe: 'Risques', titre: 'RISQUE DE GEL', court: 'Risque de gel', unite: '', decimales: 0, paliers: PALIERS_RISQUE_GEL, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.mini, SEUILS_GEL, true), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-pluie', groupe: 'Risques', titre: 'RISQUE DE FORTE PLUIE', court: 'Risque de pluie', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(pluieMax(x.pluieJourneeMax, x.pluieJournee), [10, 30, 60, 100]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-vent', groupe: 'Risques', titre: 'RISQUE DE VENT VIOLENT', court: 'Risque de vent violent', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.rafaleJournee, [60, 80, 100, 120]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-tempete', groupe: 'Risques', titre: 'RISQUE DE TEMPÊTE', court: 'Risque de tempête (rafales dès 90 km/h)', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.rafaleJournee, [90, 95, 100, 120]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
@@ -505,6 +508,7 @@ const THEMES_PREVISION_BASE: ThemePrevision[] = [
   { id: 'risque-neige', groupe: 'Risques', titre: 'RISQUE DE NEIGE', court: 'Risque de neige', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.neigeJournee, [1, 5, 15, 30]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-verglas', groupe: 'Risques', titre: 'RISQUE DE VERGLAS', court: 'Risque de verglas (indicatif)', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: niveauVerglas, texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-froid-periode', groupe: 'Risques', periode: true, titre: 'RISQUE DE FROID ET DE GEL SUR LA PÉRIODE', court: 'Risque de froid et de gel sur une période', unite: '', decimales: 0, paliers: PALIERS_RISQUE_GEL, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.miniPeriode, [0, -5, -10, -15], true), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
+  { id: 'risque-gel-periode', groupe: 'Risques', periode: true, titre: 'RISQUE DE GEL SUR LA PÉRIODE', court: 'Risque de gel sur une période', unite: '', decimales: 0, paliers: PALIERS_RISQUE_GEL, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.miniPeriode, SEUILS_GEL, true), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-pluie-periode', groupe: 'Risques', periode: true, titre: 'RISQUE DE FORTE PLUIE SUR LA PÉRIODE', court: 'Risque de pluie sur une période', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(pluieMax(x.pluiePeriodeMax, x.pluiePeriode), [10, 30, 60, 100]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-vent-periode', groupe: 'Risques', periode: true, titre: 'RISQUE DE VENT VIOLENT SUR LA PÉRIODE', court: 'Risque de vent violent sur une période', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.rafalePeriode, [60, 80, 100, 120]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-tempete-periode', groupe: 'Risques', periode: true, titre: 'RISQUE DE TEMPÊTE SUR LA PÉRIODE', court: 'Risque de tempête sur une période (rafales dès 90 km/h)', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.rafalePeriode, [90, 95, 100, 120]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
@@ -512,6 +516,7 @@ const THEMES_PREVISION_BASE: ThemePrevision[] = [
   { id: 'risque-neige-periode', groupe: 'Risques', periode: true, titre: 'RISQUE DE NEIGE SUR LA PÉRIODE', court: 'Risque de neige sur une période', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.neigePeriode, [1, 5, 15, 30]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-orage-24h', groupe: 'Risques', fenetreHeures: 24, titre: 'RISQUE D’ORAGE DANS LES 24 PROCHAINES HEURES', court: 'Risque d’orage sur 24 h', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => x.orage24h, texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-froid-24h', groupe: 'Risques', fenetreHeures: 24, titre: 'RISQUE DE FROID ET DE GEL DANS LES 24 PROCHAINES HEURES', court: 'Risque de froid et de gel sur 24 h', unite: '', decimales: 0, paliers: PALIERS_RISQUE_GEL, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.mini24h, [0, -5, -10, -15], true), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
+  { id: 'risque-gel-24h', groupe: 'Risques', fenetreHeures: 24, titre: 'RISQUE DE GEL DANS LES 24 PROCHAINES HEURES', court: 'Risque de gel sur 24 h', unite: '', decimales: 0, paliers: PALIERS_RISQUE_GEL, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.mini24h, SEUILS_GEL, true), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-pluie-24h', groupe: 'Risques', fenetreHeures: 24, titre: 'RISQUE DE FORTE PLUIE DANS LES 24 PROCHAINES HEURES', court: 'Risque de pluie sur 24 h', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(pluieMax(x.pluie24hMax, x.pluie24h), [10, 30, 60, 100]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-vent-24h', groupe: 'Risques', fenetreHeures: 24, titre: 'RISQUE DE VENT VIOLENT DANS LES 24 PROCHAINES HEURES', court: 'Risque de vent violent sur 24 h', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.rafale24h, [60, 80, 100, 120]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
   { id: 'risque-tempete-24h', groupe: 'Risques', fenetreHeures: 24, titre: 'RISQUE DE TEMPÊTE DANS LES 24 PROCHAINES HEURES', court: 'Risque de tempête sur 24 h (rafales dès 90 km/h)', unite: '', decimales: 0, paliers: PALIERS_RISQUE, ordre: 'desc', titreTop: 'Les plus exposés', valeur: (x) => niveauSeuils(x.rafale24h, [90, 95, 100, 120]), texteValeur: (v) => NIVEAUX_ORAGE[Math.max(0, Math.min(4, Math.round(v)))] },
@@ -541,10 +546,19 @@ const PALIERS_FROID_CHIFFRES: Palier[] = [
   p(-9.99, '#1a4fc4', BLANC, 'Fort (≤ -5 °C)'),
   p(-Infinity, '#0a1a5c', BLANC, 'Sévère (≤ -10 °C)'),
 ];
+/** Gel en chiffres (valeurs arrondies à l'affichage), en bleus : faible de 0 à -2 °C, modéré de -3 à -5 °C, fort de -6 à -9 °C, sévère à -10 °C et moins. */
+const PALIERS_GEL_CHIFFRES: Palier[] = [
+  p(0.5, '#e5e7eb', NOIR, 'Pas de risque (≥ 1 °C)', true),
+  p(-2.99, '#2f9bff', BLANC, 'Faible (0 à -2 °C)'),
+  p(-5.99, '#1a4fc4', BLANC, 'Modéré (-3 à -5 °C)'),
+  p(-9.99, '#12308f', BLANC, 'Fort (-6 à -9 °C)'),
+  p(-Infinity, '#0a1a5c', BLANC, 'Sévère (≤ -10 °C)'),
+];
 const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => {
   const vent = (champ: (x: PointCarte) => number | null | undefined, seuils: [number, number, number, number]) => ({ valeur: champ, unite: 'km/h', decimales: 0, paliers: paliersRisque(seuils, 'km/h') });
   const chaud = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: paliersRisque([30, 34, 38, 42], '°C') });
   const froid = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: PALIERS_FROID_CHIFFRES, ordre: 'asc' as const });
+  const gel = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: '°', decimales: 0, paliers: PALIERS_GEL_CHIFFRES, ordre: 'asc' as const });
   const pluie = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'mm', decimales: 0, paliers: paliersRisque([10, 30, 60, 100], 'mm') });
   const neige = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'cm', decimales: 0, paliers: paliersRisque([1, 5, 15, 30], 'cm') });
   const verglas = (niveau: (x: PointCarte) => number | null, pluieDe: (x: PointCarte) => number | null | undefined) => ({
@@ -553,6 +567,7 @@ const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => 
   });
   return {
     'risque-froid': froid((x) => x.mini), 'risque-froid-periode': froid((x) => x.miniPeriode), 'risque-froid-24h': froid((x) => x.mini24h),
+    'risque-gel': gel((x) => x.mini), 'risque-gel-periode': gel((x) => x.miniPeriode), 'risque-gel-24h': gel((x) => x.mini24h),
     'risque-pluie': pluie((x) => pluieMax(x.pluieJourneeMax, x.pluieJournee)), 'risque-pluie-periode': pluie((x) => pluieMax(x.pluiePeriodeMax, x.pluiePeriode)), 'risque-pluie-24h': pluie((x) => pluieMax(x.pluie24hMax, x.pluie24h)),
     'risque-vent': vent((x) => x.rafaleJournee, [60, 80, 100, 120]), 'risque-vent-periode': vent((x) => x.rafalePeriode, [60, 80, 100, 120]), 'risque-vent-24h': vent((x) => x.rafale24h, [60, 80, 100, 120]),
     'risque-tempete': vent((x) => x.rafaleJournee, [90, 95, 100, 120]), 'risque-tempete-periode': vent((x) => x.rafalePeriode, [90, 95, 100, 120]), 'risque-tempete-24h': vent((x) => x.rafale24h, [90, 95, 100, 120]),

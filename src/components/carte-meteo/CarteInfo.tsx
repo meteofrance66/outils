@@ -429,7 +429,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
   );
   // Cartes froid et gel en chiffres : les 3 températures les plus élevées passent en rouge.
   const codesRouges = useMemo(() => {
-    if (!theme.id.startsWith('risque-froid') || theme.texteValeur) return new Set<string>();
+    if (!(theme.id.startsWith('risque-froid') || theme.id.startsWith('risque-gel')) || theme.texteValeur) return new Set<string>();
     return new Set([...dansZone].filter((p) => !p.neige).sort((a, b) => b.valeur - a.valeur || a.nom.localeCompare(b.nom, 'fr')).slice(0, 3).map((p) => p.code));
   }, [dansZone, theme.id, theme.texteValeur]);
   // Classement : stations jusqu'à l'altitude demandée (sinon les sommets écrasent le classement des températures).

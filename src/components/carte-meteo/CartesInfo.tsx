@@ -58,7 +58,7 @@ const COULEURS_FRANCE: { libelle: string; valeur: string }[] = [
   { libelle: 'Violet bleuté (teinte d’origine)', valeur: '#8f9ee8' },
 ];
 /** Petit picto des cartes de risque (type de risque, puis 📆 pour une période ou ⏱️ pour 24 h), pour les distinguer d'un coup d'œil. */
-const PICTO_RISQUE: Record<string, string> = { orage: '⛈️', froid: '❄️', pluie: '🌧️', vent: '💨', tempete: '🌪️', chaleur: '🔥', neige: '⛄', verglas: '🧊' };
+const PICTO_RISQUE: Record<string, string> = { orage: '⛈️', froid: '❄️', gel: '🥶', pluie: '🌧️', vent: '💨', tempete: '🌪️', chaleur: '🔥', neige: '⛄', verglas: '🧊' };
 const pictoRisque = (id: string): string => {
   const type = Object.keys(PICTO_RISQUE).find((k) => id.startsWith(`risque-${k}`)) ?? (id === 'orages' ? 'orage' : null);
   if (!type) return '';
@@ -74,6 +74,7 @@ const DANGERS: { id: string; libelle: string; picto: string }[] = [
   { id: 'risque-verglas', libelle: 'Verglas', picto: PICTO_RISQUE.verglas },
   { id: 'risque-tempete', libelle: 'Tempête', picto: PICTO_RISQUE.tempete },
   { id: 'risque-froid', libelle: 'Froid et gel', picto: PICTO_RISQUE.froid },
+  { id: 'risque-gel', libelle: 'Gel', picto: PICTO_RISQUE.gel },
   { id: 'risque-chaleur', libelle: 'Chaleur', picto: PICTO_RISQUE.chaleur },
 ];
 /** Danger d'une carte de risque : « risque-pluie-24h » → « risque-pluie », « orages » → « risque-orage ». */
@@ -86,6 +87,7 @@ const BILANS_PAR_DANGER: Record<string, string[]> = {
   'risque-verglas': [],
   'risque-tempete': ['raf24', 'obs-raf36', 'obs-raf48', 'obs-raf72'],
   'risque-froid': ['tn-prov', 'tn-fin', 'obs-tn24'],
+  'risque-gel': ['tn-prov', 'tn-fin', 'obs-tn24'],
   'risque-chaleur': ['tx-chaleur', 'tx-prov', 'tx-fin', 'obs-tx24'],
 };
 /** Fenêtres réellement calculées par l’API des observations ; aucune prévision dans les bilans. */
@@ -1818,7 +1820,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                             : (theme as ThemePrevision).periode
                             ? (theme as ThemePrevision).montagne
                               ? `${sousTitrePeriode} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET ${theme.groupe === GROUPE_RISQUES && sensRelief === 'moins' ? 'MOINS' : 'PLUS'}`
-                              : theme.id === 'risque-froid-periode' ? `NUIT ${sousTitrePeriode}` : sousTitrePeriode
+                              : theme.id === 'risque-froid-periode' || theme.id === 'risque-gel-periode' ? `NUIT ${sousTitrePeriode}` : sousTitrePeriode
                             : (theme as ThemePrevision).montagne
                               ? `${libelleJour(dateISO)} · ${(theme.groupe === GROUPE_RISQUES && reliefAlt ? reliefAlt : 1000).toLocaleString('fr-FR')} M ET ${theme.groupe === GROUPE_RISQUES && sensRelief === 'moins' ? 'MOINS' : 'PLUS'}`
                               : libelleJour(dateISO)) +
