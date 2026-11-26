@@ -41,9 +41,9 @@ export function useBasTransparentPictos(sources: string[]): (src: string) => num
       if (!src || BAS_TRANSPARENT.has(src) || EN_COURS.has(src)) continue;
       EN_COURS.add(src);
       mesurer(src)
-        .catch(() => 0)
-        .then((part) => {
-          BAS_TRANSPARENT.set(src, part);
+        .then((part) => BAS_TRANSPARENT.set(src, part))
+        .catch(() => undefined) // échec : pas de mémoire, la mesure sera retentée plus tard
+        .then(() => {
           EN_COURS.delete(src);
           if (monte.current) setVersion((v) => v + 1);
         });

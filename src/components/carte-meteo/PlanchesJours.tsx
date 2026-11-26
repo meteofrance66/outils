@@ -979,7 +979,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                           draggable={false}
                           title="Cliquer pour changer le picto, glisser pour déplacer le picto et ses températures"
                           onPointerDown={(e) => debutPicto(e, cle)}
-                          style={{ width: tailleImagePicto, height: tailleImagePicto, marginTop: taillePicto - tailleImagePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
+                          style={{ width: tailleImagePicto, height: tailleImagePicto, maxWidth: 'none', flexShrink: 0, marginTop: taillePicto - tailleImagePicto, filter: styleSauge ? 'drop-shadow(0 1px 1.5px rgba(16,47,76,0.22))' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.55))', cursor: 'grab', touchAction: 'none', visibility: pictoId ? 'visible' : 'hidden' }}
                         />
                         {avecLpn && (
                           <span style={{ marginTop: -remontee, fontFamily: policeValeurs, fontWeight: fb ? GRAISSES_PLANCHE.libelle : 700, fontSize: Math.max(12, Math.round(taillePicto * 0.22)), color: '#0c4a6e', background: '#f0f9ff', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>LPN : {lpns[cle]} m</span>
