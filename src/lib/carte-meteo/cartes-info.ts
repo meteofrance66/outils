@@ -16,8 +16,8 @@ export interface Palier {
   texte: string;
   libelle: string;
   neutre?: boolean;
-  /** Mot du niveau en rouge dans la pastille (fond blanc) ; le fond des zones et la légende gardent leurs couleurs. */
-  libelleRouge?: boolean;
+  /** Couleur du mot du niveau dans la pastille (qui passe sur fond blanc) ; le fond des zones et la légende gardent leurs couleurs. */
+  couleurMot?: string;
 }
 
 export interface ThemeInfo {
@@ -449,11 +449,11 @@ const PALIERS_RISQUE_GEL: Palier[] = [
 ];
 /** Carte « Risque de gel » : températures minimales (°C) de chaque niveau, au dixième près de l'arrondi affiché : faible de +3 à +1, modéré de 0 à -2, fort de -3 à -5, sévère à -6 et moins. */
 const SEUILS_GEL: [number, number, number, number] = [3.49, 0.49, -2.51, -5.51];
-/** Carte « Risque de gel » : dégradé du bleu (faible, modéré) à l'indigo (fort) puis au violet (sévère). */
+/** Carte « Risque de gel » : zones en dégradé du bleu (faible, modéré) à l'indigo (fort) puis au violet (sévère) ; mots des pastilles en dégradé du rouge (modéré) au violet (sévère). */
 const PALIERS_GEL_NIVEAUX: Palier[] = [
-  p(4, '#8e24aa', BLANC, 'Sévère'),
-  { ...p(3, '#4338ca', BLANC, 'Fort'), libelleRouge: true },
-  { ...p(2, '#1a4fc4', BLANC, 'Modéré'), libelleRouge: true },
+  { ...p(4, '#8e24aa', BLANC, 'Sévère'), couleurMot: '#7b2cbf' },
+  { ...p(3, '#4338ca', BLANC, 'Fort'), couleurMot: '#b0226e' },
+  { ...p(2, '#1a4fc4', BLANC, 'Modéré'), couleurMot: '#e5191e' },
   p(1, '#2f9bff', BLANC, 'Faible'),
   p(-Infinity, '#e5e7eb', NOIR, 'Pas de risque', true),
 ];
@@ -560,8 +560,8 @@ const PALIERS_FROID_CHIFFRES: Palier[] = [
 const PALIERS_GEL_CHIFFRES: Palier[] = [
   p(3.5, '#e5e7eb', NOIR, 'Pas de risque (≥ 4 °C)', true),
   p(0.5, '#8ec8ff', NOIR, 'Faible (+1 à +3 °C)'),
-  { ...p(-2.5, '#2f9bff', BLANC, 'Modéré (0 à -2 °C)'),  },
-  { ...p(-5.5, '#4338ca', BLANC, 'Fort (-3 à -5 °C)'),  },
+  p(-2.5, '#2f9bff', BLANC, 'Modéré (0 à -2 °C)'),
+  p(-5.5, '#4338ca', BLANC, 'Fort (-3 à -5 °C)'),
   p(-Infinity, '#8e24aa', BLANC, 'Sévère (≤ -6 °C)'),
 ];
 const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => {
