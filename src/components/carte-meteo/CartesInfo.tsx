@@ -291,6 +291,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
   const [tailleTableau, setTailleTableau] = useState(100);
   // Cartes d'alertes (?cartes=alertes) : sans tableau du classement par défaut (le visiteur peut le réafficher).
   const [sansTableau, setSansTableau] = useState(modeInitial === 'alertes');
+  const [sansLegende, setSansLegende] = useState(false);
   /** Cartes de risque : afficher les chiffres (km/h, mm, °C) à la place des niveaux (faible, modéré…). */
   const [chiffres, setChiffres] = useState(false);
   /** Cartes de risque : durée choisie (par défaut une période) ; la liste ne garde qu'une entrée par risque, la durée se change dans le menu « Durée du risque ». */
@@ -1578,6 +1579,13 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
               <option value="sans">Sans tableau</option>
             </select>
           </label>
+          <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-1' : ''}`}>
+            <span className={legende}>Légende</span>
+            <select value={sansLegende ? 'sans' : 'avec'} onChange={(e) => setSansLegende(e.target.value === 'sans')} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`}>
+              <option value="avec">Avec légende</option>
+              <option value="sans">Sans légende</option>
+            </select>
+          </label>
           <label className={`text-sm font-medium ${uneCarte ? 'lg:col-span-1' : ''} ${sansTableau ? 'opacity-50' : ''}`}>
             <span className={legende}>{uneCarte ? 'Police tableau' : 'Grosseur de la police du tableau'}</span>
             <select value={tailleTableau} disabled={sansTableau} onChange={(e) => setTailleTableau(Number(e.target.value))} className={`${selectBarre} ${uneCarte ? 'w-full' : ''}`} title="Taille du tableau du classement (« Les plus arrosés »…)">
@@ -1743,7 +1751,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         </p>
                       ) : (
                         <CarteInfo
-                          zonageFin={zonageFin && niveau === 'france'} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
+                          zonageFin={zonageFin && niveau === 'france'} sansTableau={sansTableau} sansLegende={sansLegende} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                           {...retouchesDe(theme.id)}
                           theme={theme}
                           zone={zone}
@@ -1801,7 +1809,7 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                       )
                     ) : mode === 'prevision' ? (
                       <CarteInfo
-                          zonageFin={zonageFin && niveau === 'france'} sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
+                          zonageFin={zonageFin && niveau === 'france'} sansTableau={sansTableau} sansLegende={sansLegende} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                         {...retouchesDe(theme.id)}
                         theme={themeAffiche(theme as ThemePrevision)}
                         zone={zone}
@@ -1836,10 +1844,10 @@ export default function CartesInfo({ aujourdhui: aujourdhuiServeur, modeInitial,
                         legendeAltitude={theme.groupe === GROUPE_RISQUES && reliefAlt ? `${reliefAlt.toLocaleString('fr-FR')} m et ${sensRelief === 'moins' ? 'moins' : 'plus'}` : cumulPluieAlt(theme) ? `${pluieAlt.toLocaleString('fr-FR')} m et moins` : ''}
                       />
                     ) : mode === 'bilan' ? (
-                      <CarteInfo  sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} {...retouchesDe(theme.id)} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
+                      <CarteInfo  sansTableau={sansTableau} sansLegende={sansLegende} echelleValeurs={echelleValeurs} echelleTop={echelleTableau} {...retouchesDe(theme.id)} theme={theme} zone={zone} points={pointsBilan[theme.id] ?? []} sousTitre={periodeBilan(theme.id)} logoId={logoId} prefixeFichier={prefixe} contexte={contexteBilan} />
                     ) : (
                       <CarteInfo
-                           sansTableau={sansTableau} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
+                           sansTableau={sansTableau} sansLegende={sansLegende} echelleValeurs={echelleValeurs} echelleTop={echelleTableau}
                         {...retouchesDe(theme.id)}
                         theme={theme}
                         zone={zone}

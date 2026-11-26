@@ -181,6 +181,8 @@ interface Props {
   tailleNoms?: number;
   /** Masque le tableau du classement (« Les plus fortes… »), en plus des cartes qui n'en ont pas. */
   sansTableau?: boolean;
+  /** Masque l'encadré « Légende » sur la carte. */
+  sansLegende?: boolean;
   /** Découpage automatique : nombre de zones par département (plusieurs points par département en vue France). */
   zonesParDepartement?: number;
   onValeurMove?: (code: string, dx: number, dy: number) => void;
@@ -237,7 +239,7 @@ function titreEnMinuscules(titre: string): string {
 /** Valeur d'une pastille dans son champ de saisie : nombre arrondi comme à l'affichage, virgule décimale, sans unité. */
 const saisieDe = (theme: ThemeInfo, v: number) => (theme.decimales ? v.toFixed(theme.decimales) : String(Math.round(v))).replace('.', ',').replace(/,0+$/, '');
 
-export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, modelePrevision, periodePrevision, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', legendeAltitude = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches, carre = false }: Props) {
+export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, run, modelePrevision, periodePrevision, logoId, prefixeFichier, valeursDepartements, parRegion = false, contexte = '', mention = '', legendeAltitude = '', bandeau = '', echelleTop = 1, topRouge = false, titreDroite = false, echelleValeurs = 1, pictos, onPictoClick, decalagesPictos, onPictoMove, decalagesValeurs, onValeurMove, zonesParDepartement = 1, partValeurs = 1, valeursEnMer = false, altitudeMaxTableau, valeurMin, reperes, policeValeurs, tailleNoms, sansTableau = false, sansLegende = false, zonageFin = false, styleFond: styleFondCarte, sansBandes = false, retouchesInitiales, onRetouches, carre = false }: Props) {
   const affichage = useContext(AffichageContexte);
   const fleuves = useFleuves(affichage?.fleuves !== 'aucun');
   const contoursReg = useContours(zonageFin || affichage?.contours === 'regions' ? FICHIERS_CONTOURS.regions : null);
@@ -1081,7 +1083,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
           </div>
         )}
 
-        {!enZones && <div className="cinfo-encadre" style={{ left: rectLegende.x, top: rectLegende.y, width: rectLegende.w }}>
+        {!enZones && !sansLegende && <div className="cinfo-encadre" style={{ left: rectLegende.x, top: rectLegende.y, width: rectLegende.w }}>
           <div className="cinfo-encadre-titre">{theme.unite && theme.unite !== '°' && !theme.texteValeur ? `Légende (${theme.unite})` : 'Légende'}</div>
           <ul>
             {legende.map((x) => (
