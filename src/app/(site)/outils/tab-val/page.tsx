@@ -17,7 +17,7 @@ export default function PageTabVal() {
       <h1 className="text-3xl font-extrabold">Tab Val : un tableau à partir d&apos;une liste de valeurs</h1>
       <p className="mt-2 max-w-3xl text-muted">
         Collez vos valeurs, une par ligne (« 20.9°C à Perpignan - El Vernet »), choisissez la mesure (T° maxi d&apos;hier, T° mini, rafales maxi, pluie…) et l&apos;un des quatorze styles : le tableau est classé, coloré selon
-        les paliers de la mesure et s&apos;exporte en JPG.
+        les paliers de la mesure et s&apos;exporte en JPG. L&apos;option « Typographie : Facebook » met tout le visuel en Inter (titre, noms, valeurs, adresse du site), plus lisible sur smartphone.
       </p>
       <div className="mt-6">
         <TabVal aujourdhui={aujourdhuiParis()} />

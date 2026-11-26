@@ -6,7 +6,7 @@ import { COLONNES, uniteEntete } from '@/lib/carte-meteo/colonnes-releves';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
 import { ajouterJours } from '@/lib/carte-meteo/previsions-modeles';
-import { STYLES_TABLEAU, type StyleTableau } from '@/lib/carte-meteo/styles-tableau';
+import { attendreInter, avecTypo, LARGEUR_CAPITALES_INTER, STYLES_TABLEAU, TYPOS_TABLEAU, type StyleTableau, type TypoTableau } from '@/lib/carte-meteo/styles-tableau';
 import { lireListeValeurs } from '@/lib/carte-meteo/tab-val';
 import { normaliser } from './CarteMeteo';
 
@@ -71,6 +71,8 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
   const [nombre, setNombre] = useState<(typeof NOMBRES_LIGNES)[number]>(0);
   const [lieu, setLieu] = useState('Pyrénées-Orientales');
   const [styleId, setStyleId] = useState(STYLES_TABLEAU[0].id);
+  /** Typographie : « standard » (celle du style) ou « facebook » (Inter, lisible sur smartphone). */
+  const [typo, setTypo] = useState<TypoTableau>('standard');
   const [logoId, setLogoId] = useState('pays-catalan-hd');
   const [avecRang, setAvecRang] = useState(false);
   const [source, setSource] = useState('');
@@ -108,7 +110,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
     return () => observateur.disconnect();
   }, []);
 
-  const st: StyleTableau = STYLES_TABLEAU.find((x) => x.id === styleId) ?? STYLES_TABLEAU[0];
+  const st: StyleTableau = avecTypo(STYLES_TABLEAU.find((x) => x.id === styleId) ?? STYLES_TABLEAU[0], typo);
   const modele = MODELES_TAB.find((m) => m.id === modeleId) ?? MODELES_TAB[0];
   const theme: ThemeBilan | undefined = THEMES_BILAN.find((t) => t.id === (modele.themeId || autreId));
   const lecture = useMemo(() => lireListeValeurs(texte), [texte]);
@@ -138,7 +140,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
   const marge = st.ecart ? 28 : 36;
   // Titre sur une seule ligne : police réduite quand il est long.
   const largeurTitre = LARGEUR - 2 * marge - 52 - (logo?.fichier ? 230 : 0);
-  const tailleTitre = Math.max(22, Math.min(38, Math.floor(largeurTitre / (Math.max(titre.length, 1) * (st.policeTitre.startsWith('Impact') ? 0.5 : 0.62)))));
+  const tailleTitre = Math.max(22, Math.min(38, Math.floor(largeurTitre / (Math.max(titre.length, 1) * (st.typo ? LARGEUR_CAPITALES_INTER : st.policeTitre.startsWith('Impact') ? 0.5 : 0.62)))));
   const etendue = useMemo(() => {
     const v = lignes.map((l) => l.valeur);
     return { min: v.length ? Math.min(...v) : 0, max: v.length ? Math.max(...v) : 0 };
@@ -152,7 +154,8 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
     setErreurExport(null);
     setEnExport(true);
     try {
-      await exporterEnJpg(planchRef.current, `tab-val-${modele.id === 'autre' ? autreId : modele.id}-${st.id}-${normaliser(lieu).replace(/ /g, '-')}-${aujourdhui}`, LARGEUR, hauteur, st.fond.startsWith('#') ? st.fond : undefined);
+      if (st.typo) await attendreInter();
+      await exporterEnJpg(planchRef.current, `tab-val-${modele.id === 'autre' ? autreId : modele.id}-${st.id}-${normaliser(lieu).replace(/ /g, '-')}-${aujourdhui}${st.typo ? '-facebook' : ''}`, LARGEUR, hauteur, st.fond.startsWith('#') ? st.fond : undefined);
     } catch (e) {
       console.error('Export du tableau Tab Val en JPG', e);
       setErreurExport("L'export a échoué. Réessayez dans un instant.");
@@ -168,10 +171,13 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
     const colore = !palier.neutre;
     const fond = colore ? palier.fond : st.neutreFond;
     const texteCouleur = colore ? palier.texte : st.neutreTexte;
-    const nombreTexte = texteInfo(theme, v);
+    // Typographie « Facebook » : vrai signe moins (−) à la place du trait d'union, bien plus lisible devant un chiffre tabulaire.
+    const nombreTexte = st.typo ? texteInfo(theme, v).replace(/^-/, '−') : texteInfo(theme, v);
+    // Typographie « Facebook » : Inter ExtraBold, chiffres tabulaires, ni ombre ni contour sur le texte ; la couleur du texte (paliers) ne change pas.
+    const typoValeur: CSSProperties = st.typo ? { fontWeight: st.typo.valeur, fontVariantNumeric: 'tabular-nums', letterSpacing: 0, textShadow: 'none' } : {};
     if (st.valeur === 'texte') {
       return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: 150, fontVariantNumeric: 'tabular-nums', fontFamily: st.policeValeur, fontSize: 30, lineHeight: 1, color: st.texte, fontWeight: 700 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: 150, fontVariantNumeric: 'tabular-nums', fontFamily: st.policeValeur, fontSize: 30, lineHeight: 1, color: st.texte, fontWeight: 700, ...typoValeur }}>
           <span style={{ width: 14, height: 14, borderRadius: st.puceRonde ? 14 : 3, background: fond, border: `1px solid ${st.puceBordure}`, display: 'inline-block' }} />
           {nombreTexte}
         </span>
@@ -182,7 +188,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
       return (
         <span style={{ display: 'block', width: largeurMesure, height: 44, background: st.barreFond, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(part * 100)}%`, background: fond, borderRadius: 6 }} />
-          <span style={{ position: 'absolute', left: 12, top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontFamily: st.policeValeur, fontSize: 29, lineHeight: 1, color: texteCouleur }}>{nombreTexte}</span>
+          <span style={{ position: 'absolute', left: 12, top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontFamily: st.policeValeur, fontSize: st.typo ? 30 : 29, lineHeight: 1, color: texteCouleur, ...typoValeur }}>{nombreTexte}</span>
         </span>
       );
     }
@@ -190,7 +196,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
       st.valeur === 'pastille'
         ? { border: `2px solid ${st.pastilleBordure}`, boxShadow: st.pastilleOmbre, borderRadius: 10 }
         : { border: 'none', boxShadow: st.valeur === 'neon' ? `0 0 14px ${fond}, 0 0 4px ${fond}` : 'none', borderRadius: st.valeur === 'neon' ? 8 : 20 };
-    return <span style={{ ...pastille, background: fond, color: texteCouleur, fontFamily: st.policeValeur, fontSize: 28, lineHeight: 1, padding: '5px 16px 4px', minWidth: 110, textAlign: 'center' }}>{nombreTexte}</span>;
+    return <span style={{ ...pastille, background: fond, color: texteCouleur, fontFamily: st.policeValeur, fontSize: st.typo ? 29 : 28, lineHeight: 1, padding: st.typo ? '4px 16px' : '5px 16px 4px', minWidth: 110, textAlign: 'center', ...typoValeur }}>{nombreTexte}</span>;
   }
 
   return (
@@ -336,6 +342,22 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
             </div>
           </fieldset>
 
+          <div className="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Typographie">
+            <span className="text-sm font-medium">Typographie :</span>
+            {TYPOS_TABLEAU.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={t.id === typo}
+                onClick={() => setTypo(t.id)}
+                className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${t.id === typo ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+              >
+                {t.id === 'facebook' ? '👍 ' : ''}
+                {t.libelle}
+              </button>
+            ))}
+          </div>
+
           <div ref={colonneRef} className="min-w-0">
             {lignes.length === 0 && (
               <p className="rounded-xl border border-border bg-surface p-6 text-sm text-muted">Colle ta liste de valeurs à gauche (une par ligne) : le tableau apparaît ici.</p>
@@ -343,7 +365,8 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
             <div style={{ height: hauteur * facteur, display: lignes.length ? undefined : 'none' }}>
               <div
                 ref={planchRef}
-                style={{ width: LARGEUR, height: hauteur, transform: `scale(${facteur})`, transformOrigin: 'top left', background: st.fond, color: st.texte, fontFamily: st.police, position: 'relative', overflow: 'hidden' }}
+                // Inter « texte » (taille optique par défaut) en typographie Facebook : lettres plus ouvertes que la coupe « titrage », mieux lues quand l'image est réduite.
+                style={{ width: LARGEUR, height: hauteur, transform: `scale(${facteur})`, transformOrigin: 'top left', background: st.fond, color: st.texte, fontFamily: st.police, fontOpticalSizing: st.typo ? 'none' : undefined, position: 'relative', overflow: 'hidden' }}
               >
                 {/* Bandeau du titre */}
                 <div style={{ height: HAUTEUR_ENTETE, display: 'flex', alignItems: 'center', gap: 24, padding: `0 ${marge}px` }}>
@@ -352,8 +375,8 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
                     <img src={logo.fichier} alt="" style={{ height: 84, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
                   ) : null}
                   <div style={{ ...st.bandeau, flex: 1, minWidth: 0, padding: '10px 26px' }}>
-                    <div style={{ fontFamily: st.policeTitre, fontSize: tailleTitre, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', color: st.titre, letterSpacing: 0.5, fontWeight: st.titreGras ? 700 : 400 }}>{titre}</div>
-                    <div style={{ fontFamily: st.policeTitre, fontSize: 20, lineHeight: 1.2, color: st.sousTitre, letterSpacing: 0.5, marginTop: 2, fontWeight: st.titreGras ? 700 : 400 }}>{sousTitre}</div>
+                    <div style={{ fontFamily: st.policeTitre, fontSize: tailleTitre, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', color: st.titre, letterSpacing: st.typo ? 0.2 : 0.5, fontWeight: st.typo?.titre ?? (st.titreGras ? 700 : 400) }}>{titre}</div>
+                    <div style={{ fontFamily: st.policeTitre, fontSize: 20, lineHeight: 1.2, color: st.sousTitre, letterSpacing: st.typo ? 0.4 : 0.5, marginTop: 2, fontWeight: st.typo?.sousTitre ?? (st.titreGras ? 700 : 400) }}>{sousTitre}</div>
                   </div>
                 </div>
                 <div style={{ height: 14 }} />
@@ -379,9 +402,9 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
                       }}
                     >
                       {avecRang && (
-                        <div style={{ width: 52, flexShrink: 0, fontFamily: st.policeValeur, fontSize: 24, color: st.accent, fontStyle: st.rangItalique ? 'italic' : undefined, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</div>
+                        <div style={{ width: 52, flexShrink: 0, fontFamily: st.policeValeur, fontSize: 24, color: st.accent, fontStyle: st.rangItalique ? 'italic' : undefined, fontVariantNumeric: 'tabular-nums', fontWeight: st.typo?.valeur }}>{i + 1}</div>
                       )}
-                      <div style={{ flex: 1, minWidth: 0, fontSize: 24, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 24, fontWeight: st.typo?.nom ?? 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}</div>
                       <div style={{ width: largeurMesure, display: 'flex', justifyContent: 'center' }}>{valeurDe(l.valeur)}</div>
                     </div>
                   ))}
@@ -389,8 +412,8 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
 
                 {/* Pied */}
                 <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: HAUTEUR_PIED, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${marge}px`, fontSize: 16, color: st.pied }}>
-                  <span>{source}</span>
-                  <span style={{ fontFamily: st.policeTitre, fontSize: 22, color: st.piedMarque, letterSpacing: 0.5, fontWeight: st.titreGras ? 700 : 400 }}>www.alertes-meteo.com</span>
+                  <span style={{ fontWeight: st.typo ? 500 : undefined }}>{source}</span>
+                  <span style={{ fontFamily: st.policeTitre, fontSize: 22, color: st.piedMarque, letterSpacing: st.typo ? 0.2 : 0.5, fontWeight: st.typo?.site ?? (st.titreGras ? 700 : 400), textAlign: 'right' }}>www.alertes-meteo.com</span>
                 </div>
               </div>
             </div>

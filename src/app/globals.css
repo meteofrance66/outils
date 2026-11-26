@@ -31,6 +31,14 @@
   font-style: normal;
   font-display: swap;
 }
+/* Inter (variable, graisses 100 à 900) : typographie « Facebook » des tableaux ; téléchargée seulement quand un tableau l'utilise. */
+@font-face {
+  font-family: 'Inter Meteo';
+  src: url('/fonts/meteo/Inter-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   --bg: #f4f7fb;

@@ -8,7 +8,7 @@ import { palierDe, texteInfo, type ReponseBilans } from '@/lib/carte-meteo/carte
 import { COLONNES, uniteEntete, type Ligne } from '@/lib/carte-meteo/colonnes-releves';
 import { exporterEnJpg } from '@/lib/carte-meteo/ExportJpg';
 import { LOGOS_PRESETS } from '@/lib/carte-meteo/logos';
-import { STYLES_TABLEAU, type StyleTableau } from '@/lib/carte-meteo/styles-tableau';
+import { attendreInter, avecTypo, LARGEUR_CAPITALES_INTER, STYLES_TABLEAU, TYPOS_TABLEAU, type StyleTableau, type TypoTableau } from '@/lib/carte-meteo/styles-tableau';
 import { pointsDuBilan, sansValeursAberrantes } from '@/lib/carte-meteo/stations-bilan';
 import { normaliser } from './CarteMeteo';
 import CarteInfo from './CarteInfo';
@@ -68,6 +68,8 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
   const [avecAltitude, setAvecAltitude] = useState(false);
   const [avecTitres, setAvecTitres] = useState(false);
   const [styleId, setStyleId] = useState(STYLES_TABLEAU[0].id);
+  /** Typographie : « standard » (celle du style) ou « facebook » (Inter, lisible sur smartphone). */
+  const [typo, setTypo] = useState<TypoTableau>('standard');
   const [titreSaisi, setTitreSaisi] = useState<string | null>(null);
   const [enExport, setEnExport] = useState(false);
   const [erreurExport, setErreurExport] = useState<string | null>(null);
@@ -83,7 +85,7 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
     return () => observateur.disconnect();
   }, []);
 
-  const st: StyleTableau = STYLES_TABLEAU.find((x) => x.id === styleId) ?? STYLES_TABLEAU[0];
+  const st: StyleTableau = avecTypo(STYLES_TABLEAU.find((x) => x.id === styleId) ?? STYLES_TABLEAU[0], typo);
   const colonnesChoisies = mesures.map((id) => COLONNES.find((c) => c.theme.id === id)).filter((c): c is NonNullable<typeof c> => !!c);
   const classement = colonnesChoisies[0]?.theme;
 
@@ -162,14 +164,15 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
   const marge = st.ecart ? 28 : 36;
   // Titre sur une seule ligne : police réduite quand il est long (Impact est étroite, les autres polices plus larges).
   const largeurTitre = LARGEUR - 2 * marge - 52 - (logo?.fichier ? 230 : 0);
-  const tailleTitre = Math.max(22, Math.min(38, Math.floor(largeurTitre / (Math.max(titre.length, 1) * (st.policeTitre.startsWith('Impact') ? 0.5 : 0.62)))));
+  const tailleTitre = Math.max(22, Math.min(38, Math.floor(largeurTitre / (Math.max(titre.length, 1) * (st.typo ? LARGEUR_CAPITALES_INTER : st.policeTitre.startsWith('Impact') ? 0.5 : 0.62)))));
 
   async function exporter() {
     if (!planchRef.current) return;
     setErreurExport(null);
     setEnExport(true);
     try {
-      await exporterEnJpg(planchRef.current, `tableau-${modeleId}-${st.id}-${normaliser(nomZone).replace(/ /g, '-')}-${new Date().toISOString().slice(0, 10)}`, LARGEUR, hauteur, st.fond.startsWith('#') ? st.fond : undefined);
+      if (st.typo) await attendreInter();
+      await exporterEnJpg(planchRef.current, `tableau-${modeleId}-${st.id}-${normaliser(nomZone).replace(/ /g, '-')}-${new Date().toISOString().slice(0, 10)}${st.typo ? '-facebook' : ''}`, LARGEUR, hauteur, st.fond.startsWith('#') ? st.fond : undefined);
     } catch (e) {
       console.error('Export du tableau en JPG', e);
       setErreurExport("L'export a échoué. Réessayez dans un instant.");
@@ -186,10 +189,13 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
     const colore = !palier.neutre;
     const fond = colore ? palier.fond : st.neutreFond;
     const texte = colore ? palier.texte : st.neutreTexte;
-    const nombre = texteInfo(theme, v);
+    // Typographie « Facebook » : vrai signe moins (−) à la place du trait d'union, Inter ExtraBold, chiffres tabulaires, ni ombre ni contour sur le texte ;
+    // la couleur du texte (paliers) ne change pas.
+    const nombre = st.typo ? texteInfo(theme, v).replace(/^-/, '−') : texteInfo(theme, v);
+    const typoValeur: CSSProperties = st.typo ? { fontWeight: premiere ? st.typo.valeur : 700, fontVariantNumeric: 'tabular-nums', letterSpacing: 0, textShadow: 'none' } : {};
     if (st.valeur === 'texte') {
       return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: Math.min(largeurMesure - 40, 150), fontVariantNumeric: 'tabular-nums', fontFamily: st.policeValeur, fontSize: premiere ? 30 : 26, lineHeight: 1, color: st.texte, fontWeight: premiere ? 700 : 500 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: Math.min(largeurMesure - 40, 150), fontVariantNumeric: 'tabular-nums', fontFamily: st.policeValeur, fontSize: premiere ? 30 : 26, lineHeight: 1, color: st.texte, fontWeight: premiere ? 700 : 500, ...typoValeur }}>
           <span style={{ width: 14, height: 14, borderRadius: st.puceRonde ? 14 : 3, background: fond, border: `1px solid ${st.puceBordure}`, display: 'inline-block' }} />
           {nombre}
         </span>
@@ -201,7 +207,7 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
       return (
         <span style={{ display: 'block', width: largeurMesure - 12, height: 44, background: st.barreFond, borderRadius: 6, overflow: 'hidden', position: 'relative' }}>
           <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(part * 100)}%`, background: fond, borderRadius: 6 }} />
-          <span style={{ position: 'absolute', left: 12, top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontFamily: st.policeValeur, fontSize: 29, lineHeight: 1, color: texte }}>{nombre}</span>
+          <span style={{ position: 'absolute', left: 12, top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontFamily: st.policeValeur, fontSize: st.typo ? 30 : 29, lineHeight: 1, color: texte, ...typoValeur }}>{nombre}</span>
         </span>
       );
     }
@@ -210,7 +216,7 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
         ? { border: `2px solid ${st.pastilleBordure}`, boxShadow: st.pastilleOmbre, borderRadius: 10 }
         : { border: 'none', boxShadow: st.valeur === 'neon' ? `0 0 14px ${fond}, 0 0 4px ${fond}` : 'none', borderRadius: st.valeur === 'neon' ? 8 : 20 };
     return (
-      <span style={{ ...pastille, background: fond, color: texte, fontFamily: st.policeValeur, fontSize: 26, lineHeight: 1, padding: '5px 16px 4px', minWidth: 96, textAlign: 'center' }}>{nombre}</span>
+      <span style={{ ...pastille, background: fond, color: texte, fontFamily: st.policeValeur, fontSize: st.typo ? 27 : 26, lineHeight: 1, padding: st.typo ? '4px 16px' : '5px 16px 4px', minWidth: 96, textAlign: 'center', ...typoValeur }}>{nombre}</span>
     );
   }
 
@@ -253,6 +259,22 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
           ))}
         </div>
       </fieldset>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Typographie">
+        <span className="text-sm font-medium">Typographie :</span>
+        {TYPOS_TABLEAU.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            aria-pressed={t.id === typo}
+            onClick={() => setTypo(t.id)}
+            className={`rounded-full border px-4 py-1.5 text-sm font-semibold ${t.id === typo ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}
+          >
+            {t.id === 'facebook' ? '👍 ' : ''}
+            {t.libelle}
+          </button>
+        ))}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
         <label className="text-sm font-medium">
@@ -389,6 +411,8 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
               background: st.fond,
               color: st.texte,
               fontFamily: st.police,
+              // Typographie Facebook : Inter « texte » (taille optique par défaut), lettres plus ouvertes, mieux lues quand l'image est réduite.
+              fontOpticalSizing: st.typo ? 'none' : undefined,
               position: 'relative',
               overflow: 'hidden',
             }}
@@ -400,8 +424,8 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
                 <img src={logo.fichier} alt="" style={{ height: 84, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
               ) : null}
               <div style={{ ...st.bandeau, flex: 1, minWidth: 0, padding: '10px 26px' }}>
-                <div style={{ fontFamily: st.policeTitre, fontSize: tailleTitre, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', color: st.titre, letterSpacing: 0.5, fontWeight: st.titreGras ? 700 : 400 }}>{titre}</div>
-                <div style={{ fontFamily: st.policeTitre, fontSize: 20, lineHeight: 1.2, color: st.sousTitre, letterSpacing: 0.5, marginTop: 2, fontWeight: st.titreGras ? 700 : 400 }}>{sousTitre}</div>
+                <div style={{ fontFamily: st.policeTitre, fontSize: tailleTitre, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', color: st.titre, letterSpacing: st.typo ? 0.2 : 0.5, fontWeight: st.typo?.titre ?? (st.titreGras ? 700 : 400) }}>{titre}</div>
+                <div style={{ fontFamily: st.policeTitre, fontSize: 20, lineHeight: 1.2, color: st.sousTitre, letterSpacing: st.typo ? 0.4 : 0.5, marginTop: 2, fontWeight: st.typo?.sousTitre ?? (st.titreGras ? 700 : 400) }}>{sousTitre}</div>
               </div>
             </div>
 
@@ -435,10 +459,10 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
                     borderLeft: st.ecart ? `6px solid ${st.accent}` : undefined,
                   }}
                 >
-                  <div style={{ flex: 1, minWidth: 0, fontSize: 22, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 22, fontWeight: st.typo?.nom ?? 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {l.nom}
-                    <span style={{ marginLeft: 8, fontSize: 17, fontWeight: 400, color: st.secondaire }}>({l.dep})</span>
-                    {avecAltitude && l.alt != null ? <span style={{ marginLeft: 10, fontSize: 15, fontWeight: 400, color: st.secondaire }}>{l.alt} m</span> : null}
+                    <span style={{ marginLeft: 8, fontSize: 17, fontWeight: st.typo ? 500 : 400, color: st.secondaire }}>({l.dep})</span>
+                    {avecAltitude && l.alt != null ? <span style={{ marginLeft: 10, fontSize: 15, fontWeight: st.typo ? 500 : 400, color: st.secondaire }}>{l.alt} m</span> : null}
                   </div>
                   {colonnesChoisies.map(({ theme }, j) => (
                     <div key={theme.id} style={{ width: largeurMesure, display: 'flex', justifyContent: 'center' }}>
@@ -451,8 +475,8 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
 
             {/* Pied */}
             <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: HAUTEUR_PIED, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${marge}px`, fontSize: 16, color: st.pied }}>
-              <span>Relevés Météo-France{bilans.majA ? ` · ${new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}` : ''}</span>
-              <span style={{ fontFamily: st.policeTitre, fontSize: 22, color: st.piedMarque, letterSpacing: 0.5, fontWeight: st.titreGras ? 700 : 400 }}>www.alertes-meteo.com</span>
+              <span style={{ fontWeight: st.typo ? 500 : undefined }}>Relevés Météo-France{bilans.majA ? ` · ${new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}` : ''}</span>
+              <span style={{ fontFamily: st.policeTitre, fontSize: 22, color: st.piedMarque, letterSpacing: st.typo ? 0.2 : 0.5, fontWeight: st.typo?.site ?? (st.titreGras ? 700 : 400), textAlign: 'right' }}>www.alertes-meteo.com</span>
             </div>
           </div>
         </div>

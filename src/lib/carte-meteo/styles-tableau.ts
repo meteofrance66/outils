@@ -45,6 +45,73 @@ export interface StyleTableau {
   puceRonde?: boolean;
   puceBordure: string;
   barreFond: string;
+  /** Graisses de la typographie « Facebook » (Inter) ; absent : typographie propre au style. Voir avecTypo. */
+  typo?: TypoStyle;
+}
+
+/** Typographie des tableaux : « standard » (celle de chaque style) ou « facebook » (Inter partout, pensée pour la lecture sur smartphone). */
+export type TypoTableau = 'standard' | 'facebook';
+export const TYPOS_TABLEAU: { id: TypoTableau; libelle: string }[] = [
+  { id: 'standard', libelle: 'Standard (celle du style)' },
+  { id: 'facebook', libelle: 'Facebook : Inter, lisible sur smartphone' },
+];
+
+/** Graisses d'Inter par élément du tableau. */
+export interface TypoStyle {
+  titre: number;
+  sousTitre: number;
+  nom: number;
+  valeur: number;
+  site: number;
+}
+const GRAISSES_FACEBOOK: TypoStyle = { titre: 800, sousTitre: 700, nom: 700, valeur: 800, site: 600 };
+
+/**
+ * Inter, police locale (public/fonts/meteo, déclarée dans globals.css sous le nom « Inter Meteo ») et intégrée aux exports JPG.
+ * Si elle est indisponible : Inter installée sur l'appareil, puis Segoe UI, les polices système et Arial.
+ */
+export const POLICE_INTER = "'Inter Meteo', Inter, 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif";
+/** Facteur de largeur d'Inter ExtraBold en capitales (largeur d'une lettre / taille de la police, 0,59 mesuré, avec une marge) : sert à réduire un titre long. */
+export const LARGEUR_CAPITALES_INTER = 0.64;
+
+/** Luminance relative (0 à 1) d'un fond CSS : moyenne de ses couleurs hexadécimales (uni ou dégradé) ; 0 si aucune. */
+function luminanceDuFond(fond: string): number {
+  const couleurs = fond.match(/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/gi) ?? [];
+  if (couleurs.length === 0) return 0;
+  const lineaire = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const luminances = couleurs.map((hex) => {
+    const h = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex;
+    const [r, g, b] = [1, 3, 5].map((i) => lineaire(parseInt(h.slice(i, i + 2), 16) / 255));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  });
+  return luminances.reduce((a, b) => a + b, 0) / luminances.length;
+}
+
+/**
+ * Le style avec la typographie choisie. « Facebook » : Inter partout (titre ExtraBold 800, sous-titre et noms Bold 700, valeurs ExtraBold 800,
+ * adresse du site SemiBold 600), sans police condensée ni italique ; l'adresse du site est blanche sur un fond sombre (bleu marine…), pour un contraste
+ * optimal, et garde la couleur du style sur un fond clair. Couleurs, formes et dimensions du style ne changent pas.
+ */
+export function avecTypo(st: StyleTableau, typo: TypoTableau): StyleTableau {
+  if (typo !== 'facebook') return st;
+  return {
+    ...st,
+    police: POLICE_INTER,
+    policeTitre: POLICE_INTER,
+    policeValeur: POLICE_INTER,
+    rangItalique: false,
+    typo: GRAISSES_FACEBOOK,
+    piedMarque: luminanceDuFond(st.fond) < 0.25 ? '#ffffff' : st.piedMarque,
+  };
+}
+
+/** Attend les graisses d'Inter avant un export (l'image doit être figée avec la bonne police) ; sans erreur si elle est indisponible : la police de secours prend le relais. */
+export async function attendreInter(): Promise<void> {
+  try {
+    await Promise.all([600, 700, 800].map((graisse) => document.fonts.load(`${graisse} 24px "Inter Meteo"`)));
+  } catch {
+    // police locale indisponible : police de secours de POLICE_INTER
+  }
 }
 
 const IMPACT = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
