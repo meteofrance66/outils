@@ -449,10 +449,10 @@ const PALIERS_RISQUE_GEL: Palier[] = [
 ];
 /** Carte « Risque de gel » : températures minimales (°C) de chaque niveau, au dixième près de l'arrondi affiché : faible de +3 à +1, modéré de 0 à -2, fort de -3 à -5, sévère à -6 et moins. */
 const SEUILS_GEL: [number, number, number, number] = [3.49, 0.49, -2.51, -5.51];
-/** Carte « Risque de gel » : niveaux en bleus, comme le froid. */
+/** Carte « Risque de gel » : dégradé du bleu (faible, modéré) à l'indigo (fort) puis au violet (sévère). */
 const PALIERS_GEL_NIVEAUX: Palier[] = [
-  p(4, '#0a1a5c', BLANC, 'Sévère'),
-  { ...p(3, '#12308f', BLANC, 'Fort'), libelleRouge: true },
+  p(4, '#8e24aa', BLANC, 'Sévère'),
+  { ...p(3, '#4338ca', BLANC, 'Fort'), libelleRouge: true },
   { ...p(2, '#1a4fc4', BLANC, 'Modéré'), libelleRouge: true },
   p(1, '#2f9bff', BLANC, 'Faible'),
   p(-Infinity, '#e5e7eb', NOIR, 'Pas de risque', true),
@@ -561,8 +561,8 @@ const PALIERS_GEL_CHIFFRES: Palier[] = [
   p(3.5, '#e5e7eb', NOIR, 'Pas de risque (≥ 4 °C)', true),
   p(0.5, '#8ec8ff', NOIR, 'Faible (+1 à +3 °C)'),
   { ...p(-2.5, '#2f9bff', BLANC, 'Modéré (0 à -2 °C)'),  },
-  { ...p(-5.5, '#1a4fc4', BLANC, 'Fort (-3 à -5 °C)'),  },
-  p(-Infinity, '#0a1a5c', BLANC, 'Sévère (≤ -6 °C)'),
+  { ...p(-5.5, '#4338ca', BLANC, 'Fort (-3 à -5 °C)'),  },
+  p(-Infinity, '#8e24aa', BLANC, 'Sévère (≤ -6 °C)'),
 ];
 const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => {
   const vent = (champ: (x: PointCarte) => number | null | undefined, seuils: [number, number, number, number]) => ({ valeur: champ, unite: 'km/h', decimales: 0, paliers: paliersRisque(seuils, 'km/h') });
