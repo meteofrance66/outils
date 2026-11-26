@@ -460,11 +460,13 @@ const PALIERS_GEL_NIVEAUX: Palier[] = [
 /** Nombre de seuils atteints (0 à 4), du plus bas au plus haut ; `bas` : on compte les valeurs inférieures ou égales aux seuils. */
 const niveauSeuils = (v: number | null | undefined, seuils: [number, number, number, number], bas = false): number | null =>
   v == null || !Number.isFinite(v) ? null : seuils.filter((s) => (bas ? v <= s : v >= s)).length;
+/** Verglas : pluie (mm) sur sol gelé de chaque niveau (faible, modéré, fort, sévère). */
+const SEUILS_VERGLAS: [number, number, number, number] = [0.1, 0.3, 0.8, 2];
 /** Verglas sur 24 h glissantes (indicatif) : pluie avec gel au sol et pas de vrai redoux. */
 const niveauVerglas24h = (x: PointCarte): number | null => {
   if (x.pluie24h == null || x.mini24h == null || x.maxi24h == null) return null;
   if (x.mini24h > 0 || x.maxi24h > 3 || (x.neige24h ?? 0) >= x.pluie24h * 0.5) return 0;
-  return niveauSeuils(x.pluie24h, [1, 3, 8, 15]);
+  return niveauSeuils(x.pluie24h, SEUILS_VERGLAS);
 };
 /** Verglas (indicatif) : précipitations liquides avec des températures proches de 0 °C (gel au sol la nuit, pas de vrai redoux dans la journée). */
 const niveauVerglas = (x: PointCarte): number | null => {
@@ -472,7 +474,7 @@ const niveauVerglas = (x: PointCarte): number | null => {
   if (pluie == null || x.mini == null || x.maxi == null) return null;
   const neige = x.neigeJournee ?? 0;
   if (x.mini > 0 || x.maxi > 3 || neige >= pluie * 0.5) return 0;
-  return niveauSeuils(pluie, [1, 3, 8, 15]);
+  return niveauSeuils(pluie, SEUILS_VERGLAS);
 };
 
 /** Cartes de prévision (paquets des modèles AROME, Harmonie, CEP, GFS). */
@@ -573,7 +575,7 @@ const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => 
   const neige = (champ: (x: PointCarte) => number | null | undefined) => ({ valeur: champ, unite: 'cm', decimales: 0, paliers: paliersRisque([1, 5, 15, 30], 'cm') });
   const verglas = (niveau: (x: PointCarte) => number | null, pluieDe: (x: PointCarte) => number | null | undefined) => ({
     valeur: (x: PointCarte) => { const n = niveau(x); return n == null ? null : n > 0 ? pluieDe(x) ?? 0 : 0; },
-    unite: 'mm', decimales: 0, paliers: paliersRisque([1, 3, 8, 15], 'mm'),
+    unite: 'mm', decimales: 1, paliers: paliersRisque(SEUILS_VERGLAS, 'mm'),
   });
   return {
     'risque-froid': froid((x) => x.mini), 'risque-froid-periode': froid((x) => x.miniPeriode), 'risque-froid-24h': froid((x) => x.mini24h),
@@ -877,7 +879,7 @@ export const NIVEAUX_RISQUE: Record<string, NiveauxRisque> = {
   'risque-vent': { grandeur: 'Rafale maximale', valeurs: ['60 à 79 km/h', '80 à 99 km/h', '100 à 119 km/h', '120 km/h et plus'] },
   'risque-tempete': { grandeur: 'Rafale maximale', valeurs: ['90 à 94 km/h', '95 à 99 km/h', '100 à 119 km/h', '120 km/h et plus'] },
   'risque-neige': { grandeur: 'Neige fraîche', valeurs: ['1 à 4 cm', '5 à 14 cm', '15 à 29 cm', '30 cm et plus'] },
-  'risque-verglas': { grandeur: 'Pluie sur sol gelé', valeurs: ['1 à 2 mm', '3 à 7 mm', '8 à 14 mm', '15 mm et plus'], note: 'Pluie avec gel au sol : minimale à 0 °C ou moins, maximale à 3 °C ou moins, sans dominante de neige. Indicatif.' },
+  'risque-verglas': { grandeur: 'Pluie sur sol gelé', valeurs: ['0,1 à 0,2 mm', '0,3 à 0,7 mm', '0,8 à 1,9 mm', '2 mm et plus'], note: 'Pluie avec gel au sol : minimale à 0 °C ou moins, maximale à 3 °C ou moins, sans dominante de neige. Indicatif.' },
   'risque-orage': { grandeur: 'Indicateur d’orage du modèle', valeurs: ['1', '2', '3', '4'], note: 'Retenu seulement s’il y a des précipitations.' },
 };
 /** Niveaux d'une carte de risque (jour, période ou 24 h), ou null pour une autre carte. */
