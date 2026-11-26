@@ -109,11 +109,11 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const etroit = LARGEUR < 1300;
   /** Tailles des textes et des bandeaux : celles de la planche paysage (1600 px), proportionnelles à la largeur en 16:9, très grandes sur téléphone. */
   const tx = (() => {
-    if (etroit) return { titre: 62, sous: 34, sousSeul: 52, jour: 40, pied: 28, logo: 104, hTitre: 232, hPied: 96, hJour: 56 };
+    // Formats étroits : la hauteur de l'en-tête (hTitre) dépend des lignes affichées, voir hauteurTitre ; le pied est discret (crédits en petit).
+    if (etroit) return { titre: 62, sous: 34, sousSeul: 52, jour: 40, pied: 18, logo: 104, hTitre: 150, hPied: 56, hJour: 56 };
     const e = LARGEUR / 1600;
     return { titre: 42 * e, sous: 22 * e, sousSeul: 34 * e, jour: 22 * e, pied: 16 * e, logo: 84 * e, hTitre: Math.round(HAUTEUR_TITRE * e), hPied: Math.round(HAUTEUR_PIED * e), hJour: Math.round(HAUTEUR_JOUR * e) };
   })();
-  const hauteurTitre = tx.hTitre;
   const hauteurPied = tx.hPied;
   const hauteurJour = tx.hJour;
   /** Modèle des prévisions (celui choisi, sinon celui de la page). */
@@ -155,8 +155,25 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [periode, setPeriode] = useState<PeriodePlanche>('journee');
   /** Titre « TENDANCE SUR 4 JOURS : … » dans l'en-tête : affiché d'office. */
   const [avecTitre, setAvecTitre] = useState(true);
+  /** Zone dans le titre (« … : Pyrénées-Orientales »), ligne des dates et mention « Mer Méditerranée » : null = selon le format, voir `epure`. */
+  const [zoneTitreChoisie, setZoneTitreChoisie] = useState<boolean | null>(null);
+  const [datesTitreChoisies, setDatesTitreChoisies] = useState<boolean | null>(null);
+  const [merChoisie, setMerChoisie] = useState<boolean | null>(null);
   const [niveauDetail, setNiveauDetail] = useState<number>(4);
   const [zone, setZone] = useState(zoneInitiale);
+  // Réseaux sociaux (formats étroits) pour le 66 : titre épuré (« MÉTÉO DU WEEK-END »), sans le département (le logo le dit), sans la ligne des dates
+  // (les bandeaux des jours les donnent) et sans « Mer Méditerranée » : plus de place pour la carte. Les cases à cocher permettent de les remettre.
+  const epure = etroit && zone === 'dep:66';
+  const avecZoneTitre = zoneTitreChoisie ?? !epure;
+  const avecDatesTitre = datesTitreChoisies ?? !epure;
+  const avecMer = merChoisie ?? !epure;
+  /** Hauteur de l'en-tête : fixe sur les planches larges ; sur les formats étroits, selon les lignes affichées (titre sur 1 ou 2 lignes, dates). */
+  const lignesTitre = !avecTitre ? 0 : etroit && avecZoneTitre ? 2 : 1;
+  const momentAffiche = periode !== 'journee';
+  const tailleSousTitre = avecTitre ? tx.sous : tx.sousSeul;
+  const lignesSousTitre = avecDatesTitre || momentAffiche ? ((avecDatesTitre ? 40 : 0) + (momentAffiche ? 18 : 0)) * tailleSousTitre * 0.43 > 800 ? 2 : 1 : 0;
+  const tailleTitre = etroit && lignesTitre === 1 ? tx.titre * 1.2 : tx.titre;
+  const hauteurTitre = etroit ? Math.max(tx.hTitre, Math.round(40 + lignesTitre * tailleTitre * 1.08 + lignesSousTitre * tailleSousTitre * 1.15 + (lignesTitre && lignesSousTitre ? 6 : 0))) : tx.hTitre;
   const [logoId, setLogoId] = useState(logoInitial);
   const fleuves = useFleuves(true);
   const [donneesDepBrutes, setDonneesDep] = useState<Record<string, PointJour[] | null>>({});
@@ -477,6 +494,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const memeMois = dates[0].slice(0, 7) === dates[dates.length - 1].slice(0, 7);
   const debutCourt = etroit && memeMois ? jourLibelle(dates[0]).replace(/ \S+$/, '') : premierJour;
   const sousTitreCarte = (weekEnd && dates.length === 2 ? `${debutCourt} ET ${jourLibelleAnnee(dates[1])}` : `DU ${debutCourt} AU ${jourLibelleAnnee(dates[dates.length - 1])}`) + moment;
+  // Titre sans la zone quand elle est masquée ; ligne sous le titre : les dates, ou seulement le moment de la journée (« APRÈS-MIDI ») si les dates sont masquées.
+  const titreCarte = avecZoneTitre ? titre : weekEnd ? 'MÉTÉO DU WEEK-END' : `TENDANCE SUR ${duree} JOURS`;
+  const sousAffiche = avecDatesTitre ? sousTitreCarte : moment.replace(/^ · /, '');
 
   async function exporterTableau() {
     const noeud = tableauRef.current;
@@ -662,6 +682,20 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           <input type="checkbox" checked={avecTitre} onChange={(e) => setAvecTitre(e.target.checked)} />
           Afficher le titre « Tendance sur … jours : zone »
         </label>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={avecZoneTitre} disabled={!avecTitre} onChange={(e) => setZoneTitreChoisie(e.target.checked)} />
+          Zone dans le titre (« … : Pyrénées-Orientales »)
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={avecDatesTitre} onChange={(e) => setDatesTitreChoisies(e.target.checked)} />
+          Ligne des dates sous le titre
+        </label>
+        {zone === 'dep:66' && styleSauge && (
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={avecMer} onChange={(e) => setMerChoisie(e.target.checked)} />
+            Mention « Mer Méditerranée »
+          </label>
+        )}
         {zone === 'france' && niveauDetail !== NIVEAU_QUATRE_PICTOS && (
           <label className="text-sm font-medium">
             <span className="mb-1 block text-orange-500">Zonage (carte fine, 864 zones)</span>
@@ -747,13 +781,15 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logo.fichier} alt="" style={{ height: zoneCarte === 'dep:66' ? tx.logo * 1.15 : tx.logo, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
               ) : null}
-              <div style={{ background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
-                {avecTitre && <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 800 : undefined, letterSpacing: typoModerne ? -0.5 : undefined, fontSize: tx.titre, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: etroit ? 'normal' : 'nowrap', overflow: 'hidden' }}>
-                  {/* Formats étroits : retour à la ligne après « : » (sinon la coupure tombait sur le trait d'union de « Pyrénées-Orientales »). */}
-                  {etroit && titre.includes(' : ') ? <>{titre.split(' : ')[0]} :<br />{titre.split(' : ').slice(1).join(' : ')}</> : titre}
-                </div>}
-                <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 600 : undefined, fontSize: avecTitre ? tx.sous : tx.sousSeul, lineHeight: etroit ? 1.1 : undefined, color: styleSauge ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousTitreCarte}</div>
-              </div>
+              {(avecTitre || sousAffiche) && (
+                <div style={{ background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
+                  {avecTitre && <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 800 : undefined, letterSpacing: typoModerne ? -0.5 : undefined, fontSize: tailleTitre, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: etroit ? 'normal' : 'nowrap', overflow: 'hidden' }}>
+                    {/* Formats étroits : retour à la ligne après « : » (sinon la coupure tombait sur le trait d'union de « Pyrénées-Orientales »). */}
+                    {etroit && titreCarte.includes(' : ') ? <>{titreCarte.split(' : ')[0]} :<br />{titreCarte.split(' : ').slice(1).join(' : ')}</> : titreCarte}
+                  </div>}
+                  {sousAffiche && <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 600 : undefined, fontSize: tailleSousTitre, lineHeight: etroit ? 1.1 : undefined, color: styleSauge ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousAffiche}</div>}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${colonnes}, ${largeurCarte}px)`, gap: ECART, padding: `0 ${MARGE}px`, justifyContent: 'center' }}>
@@ -847,7 +883,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                         <svg width={largeurCarte} height={hauteurCarte} aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
                           <g fontFamily={typoModerne ? policeValeurs : "Arial, Helvetica, sans-serif"} fontSize={taillePays} fontWeight={600} letterSpacing={1.5} textAnchor="middle">
                             <text x={largeurCarte * 0.48} y={hauteurCarte - (etroit ? 20 : 16)} fill="#52634F" opacity={0.85}>ESPAGNE</text>
-                            <text x={xMer} y={yMer} transform={`rotate(-90 ${xMer} ${yMer})`} fill="#EAF3F8" opacity={0.85} letterSpacing={typoModerne ? 0.5 : 1.5}>MER MÉDITERRANÉE</text>
+                            {avecMer && <text x={xMer} y={yMer} transform={`rotate(-90 ${xMer} ${yMer})`} fill="#EAF3F8" opacity={0.85} letterSpacing={typoModerne ? 0.5 : 1.5}>MER MÉDITERRANÉE</text>}
                           </g>
                         </svg>
                       );
