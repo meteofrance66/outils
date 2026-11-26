@@ -34,7 +34,8 @@ const RUBRIQUES: Rubrique[] = [
       '/outils/previsions-saisonnieres/', '/outils/tendance-9-mois-france/',
     ].map(lien),
   },
-  { titre: 'Alertes', rouge: true, pages: ['/outils/carte-meteo-info/?cartes=alertes', '/outils/carte-meteo/carte-alerte/'].map(lien) },
+  { titre: 'Cartes Alertes', rouge: true, href: '/outils/carte-meteo-info/?cartes=alertes', pages: [] },
+  { titre: 'Alertes réseaux', rouge: true, href: '/outils/carte-meteo/carte-alerte/', pages: [] },
   {
     titre: 'PO',
     pages: [
@@ -144,7 +145,7 @@ export default function MenuHaut() {
           if (g.href) {
             return (
               <li key={g.titre} className="relative">
-                <Link href={g.href} prefetch={false} className={`flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 hover:bg-bg ${chemin === g.href ? 'bg-bg' : ''}`}>
+                <Link href={g.href} prefetch={false} className={`flex items-center whitespace-nowrap rounded-md px-2.5 py-1.5 hover:bg-bg ${g.rouge ? 'font-extrabold uppercase text-red-600' : ''} ${chemin === g.href ? 'bg-bg' : ''}`}>
                   {g.titre}
                 </Link>
               </li>
