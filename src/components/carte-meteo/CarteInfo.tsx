@@ -945,7 +945,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
                 className="cinfo-bulle"
                 onPointerDown={onValeurMove && !edition ? (e) => debutPicto(e, p.code, decalagesValeurs, onValeurMove, undefined) : undefined}
                 title={onValeurMove && !edition ? 'Glisser pour déplacer la valeur' : undefined}
-                style={{ background: codesRouges.has(p.code) ? '#e5191e' : palier.fond, color: codesRouges.has(p.code) ? '#ffffff' : palier.texte, cursor: onValeurMove && !edition ? 'grab' : undefined, touchAction: onValeurMove && !edition ? 'none' : undefined, transform: decalagesValeurs?.[p.code] ? `translate(${decalagesValeurs[p.code][0]}px, ${decalagesValeurs[p.code][1]}px)` : undefined }}
+                style={{ background: codesRouges.has(p.code) ? '#e5191e' : palier.libelleRouge ? '#ffffff' : palier.fond, color: codesRouges.has(p.code) ? '#ffffff' : palier.libelleRouge ? '#e5191e' : palier.texte, fontWeight: palier.libelleRouge ? 800 : undefined, cursor: onValeurMove && !edition ? 'grab' : undefined, touchAction: onValeurMove && !edition ? 'none' : undefined, transform: decalagesValeurs?.[p.code] ? `translate(${decalagesValeurs[p.code][0]}px, ${decalagesValeurs[p.code][1]}px)` : undefined }}
               >
                 {avecFleche(p) && (
                   <svg viewBox="-12 -12 24 24" aria-hidden>
@@ -1085,7 +1085,7 @@ export default function CarteInfo({ theme, zone, points, sousTitre, dateCarte, r
           <div className="cinfo-encadre-titre">{theme.unite && theme.unite !== '°' && !theme.texteValeur ? `Légende (${theme.unite})` : 'Légende'}</div>
           <ul>
             {legende.map((x) => (
-              <li key={x.libelle}>
+              <li key={x.libelle} style={x.libelleRouge ? { color: '#e5191e', fontWeight: 800 } : undefined}>
                 <i style={{ background: x.fond }} />
                 {x.libelle}
               </li>
