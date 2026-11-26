@@ -73,7 +73,7 @@ const DANGERS: { id: string; libelle: string; picto: string }[] = [
   { id: 'risque-neige', libelle: 'Neige', picto: PICTO_RISQUE.neige },
   { id: 'risque-verglas', libelle: 'Verglas', picto: PICTO_RISQUE.verglas },
   { id: 'risque-tempete', libelle: 'Tempête', picto: PICTO_RISQUE.tempete },
-  { id: 'risque-froid', libelle: 'Froid et gel', picto: PICTO_RISQUE.froid },
+  { id: 'risque-froid', libelle: 'Froid', picto: PICTO_RISQUE.froid },
   { id: 'risque-gel', libelle: 'Gel', picto: PICTO_RISQUE.gel },
   { id: 'risque-chaleur', libelle: 'Chaleur', picto: PICTO_RISQUE.chaleur },
 ];
