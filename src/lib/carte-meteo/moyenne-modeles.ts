@@ -13,7 +13,9 @@ const jours = (de: string, a: string) => Math.round((Date.parse(`${a}T12:00:00Z`
 /** Modèles qui couvrent le jour (ou la période jusqu'à `fin`) dans la zone. */
 export function modelesDeLaMoyenne(dateISO: string, dep: string | null, fin?: string, france = false): ModeleSource[] {
   const echeance = jours(aujourdhuiParis(), fin ?? dateISO);
-  return (france ? MODELES_MOYENNE_FRANCE : MODELES_MOYENNE).filter((m) => modeleDisponible(m, dep) && ECHEANCE_MAX[m] >= echeance);
+  // Harmonie ne couvre qu'en partie sa dernière journée (J+2) : il n'entre dans la moyenne que jusqu'à J+1, où la journée est entière.
+  const partiel: Partial<Record<ModeleSource, true>> = { harmonie: true, harmonie2km: true };
+  return (france ? MODELES_MOYENNE_FRANCE : MODELES_MOYENNE).filter((m) => modeleDisponible(m, dep) && ECHEANCE_MAX[m] >= echeance && !(partiel[m] && echeance >= 2));
 }
 
 const arrondi = (v: number, decimales: number) => Math.round(v * 10 ** decimales) / 10 ** decimales;

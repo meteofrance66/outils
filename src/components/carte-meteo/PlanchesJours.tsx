@@ -505,6 +505,11 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
           {modeleActif.libelle} ne couvre que jusqu&apos;à J+{ECHEANCE_MAX[modeleActif.id as ModeleMeteo]} : les cartes suivantes resteront vides. Choisissez moins de jours ou un modèle à plus longue échéance (CEP, GFS).
         </p>
       )}
+      {modeleActif.id.startsWith('harmonie') && depart + duree - 1 >= ECHEANCE_MAX[modeleActif.id as ModeleMeteo] && (
+        <p role="status" className="mt-2 text-sm text-muted">
+          {modeleActif.libelle} (60 h) : la carte de J+{ECHEANCE_MAX[modeleActif.id as ModeleMeteo]} n&apos;est couverte que jusqu&apos;à la fin du modèle (le samedi vers 14 h pour le passage de 01 h UTC).
+        </p>
+      )}
       <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Format de l'image">
         <span className="text-sm font-semibold">Format :</span>
         {(Object.keys(FORMATS_PLANCHE) as FormatPlanche[]).map((id) => (

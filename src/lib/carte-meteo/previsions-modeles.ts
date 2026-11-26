@@ -62,10 +62,11 @@ export const modeleDisponible = (id: ModeleMeteo, dep: string | null): boolean =
 export const modeleParDefautJ0 = (dep: string | null): ModeleMeteo => (modeleDisponible('harmonie2km', dep) ? 'harmonie2km' : 'harmonie');
 
 /**
- * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. Les modèles à 48-60 h ne couvrent pas
- * l'après-midi de J+2 ; le CEP et GFS vont jusqu'à 15 jours (J+15 n'a des données que selon l'heure du passage).
+ * Échéance maximale (jours à partir d'aujourd'hui) proposée selon le modèle. Harmonie (60 h) va jusqu'à J+2, dont la journée n'est couverte
+ * qu'en partie (le passage de 01 h UTC s'arrête le samedi à 14 h) ; AROME (48 h) s'arrête à J+1 ; le CEP et GFS vont jusqu'à 15 jours
+ * (J+15 n'a des données que selon l'heure du passage).
  */
-export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, aromeifs: 1, harmonie2km: 1, harmonie: 1, arpege: 3, arpege025: 3, icon: 6, ukmo: 6, iconeu: 4, wrf: 3, cep: 15, aifs: 14, gfs: 15 };
+export const ECHEANCE_MAX: Record<ModeleMeteo, number> = { moyenne: 1, arome: 1, aromeifs: 1, harmonie2km: 2, harmonie: 2, arpege: 3, arpege025: 3, icon: 6, ukmo: 6, iconeu: 4, wrf: 3, cep: 15, aifs: 14, gfs: 15 };
 
 /**
  * Dernier jour (J+n) d'une période « sur une période » : les modèles à courte échéance (AROME 48 h, AROME-IFS 51 h, Harmonie 60 h)
