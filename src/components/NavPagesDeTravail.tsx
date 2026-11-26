@@ -38,7 +38,7 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/carte-meteo/video/?zone=66&abonne=1', libelle: '🔔 Vidéo TikTok + Abonnez-vous : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/video/?zone=66&type=alerte', libelle: '⚠️ Vidéo TikTok alertes orange : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/video/?zone=66&type=tendance', libelle: '📈 Vidéo TikTok tendance : Pyrénées-Orientales' },
-      { href: '/outils/carte-meteo/carte-alerte/', libelle: '🚨 Carte alerte TikTok / Facebook' },
+      { href: '/outils/carte-meteo/carte-alerte/', libelle: '🚨 Alertes réseaux' },
     ],
   },
   {
@@ -65,7 +65,7 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
     titre: 'ALERTES',
     rouge: true,
     pages: [
-      { href: '/outils/carte-meteo-info/?cartes=alertes', libelle: '⚠️ Toutes les cartes d’alertes' },
+      { href: '/outils/carte-meteo-info/?cartes=alertes', libelle: '⚠️ Cartes Alertes' },
     ],
   },
   {
