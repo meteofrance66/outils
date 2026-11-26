@@ -41,11 +41,12 @@ const REPERES_66 = [
  * carré, 4:5 pour Facebook ou Instagram, 9:16 pour TikTok, Reels ou Stories. Hauteur 0 : calculée d'après les cartes.
  */
 const FORMATS_PLANCHE = {
-  paysage: { libelle: '🖼️ Paysage (1600 px, hauteur automatique)', l: 1600, h: 0 },
-  youtube: { libelle: '▶️ YouTube / X 16:9 (1920 × 1080)', l: 1920, h: 1080 },
-  carre: { libelle: '⬜ Carré 1:1 (1080 × 1080)', l: 1080, h: 1080 },
-  facebook: { libelle: '👍 Facebook / Instagram 4:5 (1080 × 1350)', l: 1080, h: 1350 },
-  tiktok: { libelle: '📱 TikTok / Reels / Stories 9:16 (1080 × 1920)', l: 1080, h: 1920 },
+  paysage: { libelle: '🖼️ Paysage (1600 px, hauteur automatique)', l: 1600, h: 0, ech: 1 },
+  youtube: { libelle: '▶️ YouTube / X 16:9 (1920 × 1080)', l: 1920, h: 1080, ech: 1.8 },
+  // Formats vus sur un téléphone (image de 1080 px affichée sur environ 390 px) : pictos et textes nettement plus grands (`ech` : grossissement des pictos).
+  carre: { libelle: '⬜ Carré 1:1 (1080 × 1080)', l: 1080, h: 1080, ech: 1.9 },
+  facebook: { libelle: '👍 Facebook / Instagram 4:5 (1080 × 1350)', l: 1080, h: 1350, ech: 1.9 },
+  tiktok: { libelle: '📱 TikTok / Reels / Stories 9:16 (1080 × 1920)', l: 1080, h: 1920, ech: 1.9 },
 } as const;
 type FormatPlanche = keyof typeof FORMATS_PLANCHE;
 const MARGE = 24;
@@ -104,9 +105,17 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [formatChoisi, setFormatChoisi] = useState<FormatPlanche>(formatInitial);
   const format = FORMATS_PLANCHE[formatChoisi];
   const LARGEUR: number = format.l;
-  /** Format étroit (vertical ou carré) : en-tête plus haut, titre sur deux lignes si besoin. */
+  /** Format étroit (vertical ou carré, lu sur téléphone) : en-tête plus haut, titre sur deux lignes, textes très grands. */
   const etroit = LARGEUR < 1300;
-  const hauteurTitre = etroit ? 168 : HAUTEUR_TITRE;
+  /** Tailles des textes et des bandeaux : celles de la planche paysage (1600 px), proportionnelles à la largeur en 16:9, très grandes sur téléphone. */
+  const tx = (() => {
+    if (etroit) return { titre: 62, sous: 34, sousSeul: 52, jour: 40, pied: 28, logo: 104, hTitre: 232, hPied: 96, hJour: 56 };
+    const e = LARGEUR / 1600;
+    return { titre: 42 * e, sous: 22 * e, sousSeul: 34 * e, jour: 22 * e, pied: 16 * e, logo: 84 * e, hTitre: Math.round(HAUTEUR_TITRE * e), hPied: Math.round(HAUTEUR_PIED * e), hJour: Math.round(HAUTEUR_JOUR * e) };
+  })();
+  const hauteurTitre = tx.hTitre;
+  const hauteurPied = tx.hPied;
+  const hauteurJour = tx.hJour;
   /** Modèle des prévisions (celui choisi, sinon celui de la page). */
   const modeleActif = MODELES.find((m) => m.id === modeleId) ?? modele;
   const [dureeChoisie, setDuree] = useState<number>(4);
@@ -308,7 +317,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   // Le 66 est allongé d'ouest en est : un format paysage évite les grandes plages vides
   // au nord et au sud. Le bandeau du jour conserve sa hauteur pour toutes les durées.
   const rapportCarte = zoneCarte === 'dep:66' ? 1 / 0.64 : zoneCarte === 'france' ? 1 : 1 / 0.92;
-  const hauteurDeCarte = (l: number) => (zoneCarte === 'dep:66' ? HAUTEUR_JOUR + Math.round(l * 0.64) : Math.round(l * (zoneCarte === 'france' ? 1 : 0.92)));
+  const hauteurDeCarte = (l: number) => (zoneCarte === 'dep:66' ? hauteurJour + Math.round(l * 0.64) : Math.round(l * (zoneCarte === 'france' ? 1 : 0.92)));
   /**
    * Hauteur automatique (paysage) : grille choisie selon le nombre de cartes. Format imposé (carré, 4:5, 9:16, 16:9) : on retient le nombre de colonnes
    * qui donne la plus grande carte pour la place disponible, et la carte prend toute la hauteur de sa ligne.
@@ -318,18 +327,18 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
       const colonnes = COLONNES[duree];
       const largeurCarte = (LARGEUR - 2 * MARGE - (colonnes - 1) * ECART) / colonnes;
       const hauteurCarte = hauteurDeCarte(largeurCarte);
-      return { colonnes, largeurCarte, hauteurCarte, hauteur: hauteurTitre + Math.ceil(duree / colonnes) * (hauteurCarte + ECART) + HAUTEUR_PIED };
+      return { colonnes, largeurCarte, hauteurCarte, hauteur: hauteurTitre + Math.ceil(duree / colonnes) * (hauteurCarte + ECART) + hauteurPied };
     }
-    const dispo = format.h - hauteurTitre - HAUTEUR_PIED;
+    const dispo = format.h - hauteurTitre - hauteurPied;
     let meilleur = { score: -1, colonnes: 1, largeurCarte: LARGEUR - 2 * MARGE, hauteurCarte: dispo };
     for (let c = 1; c <= duree; c++) {
       const lignes = Math.ceil(duree / c);
       const l = (LARGEUR - 2 * MARGE - (c - 1) * ECART) / c;
       const h = Math.floor(dispo / lignes - ECART);
-      const carte = h - HAUTEUR_JOUR;
+      const carte = h - hauteurJour;
       if (carte < 60) continue;
-      // Surface réellement utile : la carte du territoire garde ses proportions dans le cadre.
-      const score = Math.min(l, carte * rapportCarte) * Math.min(carte, l / rapportCarte);
+      // Surface réellement utile : la carte du territoire garde ses proportions dans le cadre. Les cartes empilées (une colonne) sont préférées à surface proche.
+      const score = Math.min(l, carte * rapportCarte) * Math.min(carte, l / rapportCarte) * (c === 1 ? 1.15 : 1);
       if (score > meilleur.score) meilleur = { score, colonnes: c, largeurCarte: l, hauteurCarte: h };
     }
     return { colonnes: meilleur.colonnes, largeurCarte: meilleur.largeurCarte, hauteurCarte: meilleur.hauteurCarte, hauteur: format.h };
@@ -345,8 +354,8 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
       const demiHauteur = Math.max(y - boite.minY, boite.maxY - y);
       boite = { minX: x - demiLargeur, maxX: x + demiLargeur, minY: y - demiHauteur, maxY: y + demiHauteur };
     }
-    return ajusterVue(boite, { gauche: 8, haut: HAUTEUR_JOUR + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
-  }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte]);
+    return ajusterVue(boite, { gauche: 8, haut: hauteurJour + 6, droite: largeurCarte - 8, bas: hauteurCarte - 8 }, zoneCarte === 'france' ? 0.01 : 0.05);
+  }, [contours, codes, largeurCarte, hauteurCarte, zoneCarte, hauteurJour]);
   /** Fond de la carte : tuiles de relief ou de photos aériennes (null = fond uni bleu). Automatique : pour un département ou une région seulement. */
   const couche: Couche | null = styleFond ? null : fondChoisi === 'uni' ? null : fondChoisi === 'auto' ? (zoneCarte === 'france' ? null : coucheParDefaut(vue)) : fondChoisi;
   const merVisible = useMemo(() => (styleFond ? positionMer(terresEurope, vue, largeurCarte, hauteurCarte) : null), [styleFond, terresEurope, vue, largeurCarte, hauteurCarte]);
@@ -354,21 +363,45 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const partDetail = niveauDetail === NIVEAU_QUATRE_PICTOS ? 0.22 : (NIVEAUX_DETAIL.find((n) => n.id === niveauDetail)?.part ?? 1);
   // Format imposé : la carte du territoire garde ses proportions dans le cadre et n'en occupe qu'une partie ; pictos et nombre de points suivent
   // la largeur réellement utilisée par le territoire (même proportion que la planche paysage), sinon ils se chevauchent et cachent les températures.
-  const largeurUtile = format.h === 0 ? largeurCarte : Math.min(largeurCarte, (hauteurCarte - HAUTEUR_JOUR) * rapportCarte);
-  const tailleBase = (format.h === 0 ? Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) : Math.max(20, Math.min(54, Math.round(largeurUtile * 0.07)))) * (parQuarts ? 2.6 : 1) * (tailleIcones / 100);
+  const largeurUtile = format.h === 0 ? largeurCarte : Math.min(largeurCarte, (hauteurCarte - hauteurJour) * rapportCarte);
+  // Format imposé : même proportion que la planche paysage, grossie par `ech` (téléphone), sans plafond.
+  const tailleBase = (format.h === 0 ? Math.max(24, Math.min(54, Math.round(largeurCarte * 0.09))) : Math.max(20, Math.round(largeurUtile * 0.07)) * format.ech) * (parQuarts ? 2.6 : 1) * (tailleIcones / 100);
   // Moins il y a de points, plus les pictos grossissent (jusqu'à environ deux fois au niveau 4).
   const taillePicto = tailleBase * (parQuarts ? 1 : 1 / Math.sqrt(partDetail));
-  const tailleImagePicto = taillePicto * (zoneCarte === 'dep:66' && !weekEnd && (duree === 2 || duree === 4) ? 2 : 1);
+  // Planche paysage de 2 ou 4 jours : pictos doublés (le grossissement des formats imposés tient déjà ce rôle).
+  const tailleImagePicto = taillePicto * (format.h === 0 && zoneCarte === 'dep:66' && !weekEnd && (duree === 2 || duree === 4) ? 2 : 1);
   /** Nombre de points affichés par carte : ce que la carte peut porter sans chevauchement. */
   const nombreMax = Math.max(3, Math.floor((largeurUtile / (tailleBase * 1.7)) ** 2 * (zone === 'france' ? 0.55 : enDepartement ? 0.14 : 0.3)));
 
   /** Points de chaque jour, dans la zone, répartis sur la carte (les premiers sont toujours bien espacés). */
   const cartes = useMemo(() => {
+    // Hauteur des pastilles sous le picto (rafale, gel, orage, neige) : le point est décalé vers le haut pour que tout tienne dans la carte,
+    // avec la même marge d'un jour à l'autre (le maximum de la période) pour que le picto reste au même endroit.
+    const hauteurPastilles = (p: PointJour) =>
+      (p.rafale != null && p.rafale >= seuilRafale ? taillePicto * 0.42 * (tailleRafale / 100) * 1.3 + 6 : 0) +
+      (risques ? ((p.orage != null && p.orage >= SEUIL_ORAGE ? 1 : 0) + (p.neige != null && p.neige >= SEUIL_NEIGE ? 1 : 0) + (p.gel ? 1 : 0)) * (taillePicto * 0.36 + 10) : 0);
+    const margesBas = new Map<string, number>();
+    if (format.h !== 0) {
+      for (const date of dates) {
+        for (const p of (enDepartement ? donneesDep[`${modeleActif.id}|${zone.slice(4)}|${date}`] : jours[date]) ?? []) margesBas.set(p.code, Math.max(margesBas.get(p.code) ?? 0, hauteurPastilles(p)));
+      }
+    }
     const jourCarte = dates.map((date) => {
       const brut = enDepartement ? donneesDep[`${modeleActif.id}|${zone.slice(4)}|${date}`] : jours[date];
       const dansZone = parQuarts ? pointsParQuart(brut ?? []) : (brut ?? []).filter((p) => enDepartement || codes.has(p.code));
       // 4 zones : les quatre pictos sont toujours gardés (le Sud-Est, près du bord, était écarté quand les pictos sont gros).
-      const ecran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) })).filter((e) => parQuarts || (e.x > taillePicto * 0.95 && e.x < largeurCarte - taillePicto * 0.95 && e.y > HAUTEUR_JOUR + taillePicto * 0.7 && e.y < hauteurCarte - taillePicto * 1.3));
+      const enEcran = dansZone.map((p) => ({ p, ...versEcran(versMonde(p.lat, p.lon), vue) }));
+      // Le picto, ses températures et la pastille de rafale doivent tenir dans la carte. Planche paysage : les villes trop près du bord sont écartées.
+      // Format imposé (pictos bien plus grands) : elles sont décalées vers l'intérieur de quelques pixels, sinon les villes du sud et des bords
+      // (Font-Romeu, Banyuls…) disparaîtraient et les pictos restants se chevaucheraient.
+      const ecran = format.h === 0
+        ? enEcran.filter((e) => parQuarts || (e.x > taillePicto * 0.95 && e.x < largeurCarte - taillePicto * 0.95 && e.y > hauteurJour + taillePicto * 0.7 && e.y < hauteurCarte - taillePicto * 1.3))
+        : enEcran.map((e) => {
+            const [xMin, xMax] = [taillePicto * 0.6, largeurCarte - taillePicto * 0.6];
+            const haut = hauteurJour + taillePicto * 0.5 + 6;
+            const bas = hauteurCarte - taillePicto * 0.9 - (margesBas.get(e.p.code) ?? 0) - 6;
+            return { ...e, x: Math.min(Math.max(e.x, xMin), Math.max(xMin, xMax)), y: Math.min(Math.max(e.y, haut), Math.max(haut, bas)) };
+          });
       return { date, brut, ecran };
     });
     // Répartition calculée une seule fois sur l'ensemble des jours : les pictos sont aux mêmes endroits d'une carte à l'autre
@@ -383,7 +416,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
       vide: brut === null,
       points: [...ecran].sort((a, b) => (rang.get(a.p.code) ?? 0) - (rang.get(b.p.code) ?? 0)).slice(0, nombre),
     }));
-  }, [dates, jours, donneesDep, enDepartement, parQuarts, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail, taillePicto, modeleActif.id]);
+  }, [dates, jours, donneesDep, enDepartement, parQuarts, zone, codes, vue, largeurCarte, hauteurCarte, nombreMax, partDetail, taillePicto, modeleActif.id, format.h, hauteurJour, risques, seuilRafale, tailleRafale]);
 
   /** Lignes du tableau : régions pour la France (moyenne de leurs départements), départements pour une région, villes pour un département. */
   const lignesTableau: LigneTableau[] = useMemo(() => {
@@ -440,6 +473,10 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const memeAnnee = dates[0].slice(0, 4) === dates[dates.length - 1].slice(0, 4);
   const premierJour = memeAnnee ? jourLibelle(dates[0]) : jourLibelleAnnee(dates[0]);
   const sousTitre = (weekEnd && dates.length === 2 ? `${premierJour} ET ${jourLibelleAnnee(dates[1])}` : `DU ${premierJour} AU ${jourLibelleAnnee(dates[dates.length - 1])}`) + moment;
+  // Formats lus sur téléphone : le mois n'est écrit qu'une fois (« SAMEDI 28 ET DIMANCHE 29 NOVEMBRE 2026 ») pour que le sous-titre tienne sur une ligne.
+  const memeMois = dates[0].slice(0, 7) === dates[dates.length - 1].slice(0, 7);
+  const debutCourt = etroit && memeMois ? jourLibelle(dates[0]).replace(/ \S+$/, '') : premierJour;
+  const sousTitreCarte = (weekEnd && dates.length === 2 ? `${debutCourt} ET ${jourLibelleAnnee(dates[1])}` : `DU ${debutCourt} AU ${jourLibelleAnnee(dates[dates.length - 1])}`) + moment;
 
   async function exporterTableau() {
     const noeud = tableauRef.current;
@@ -708,11 +745,14 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
             <div style={{ height: hauteurTitre, display: 'flex', alignItems: 'center', gap: 24, padding: `0 ${MARGE}px` }}>
               {logo?.fichier ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logo.fichier} alt="" style={{ height: zoneCarte === 'dep:66' ? 84 * 1.15 : 84, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
+                <img src={logo.fichier} alt="" style={{ height: zoneCarte === 'dep:66' ? tx.logo * 1.15 : tx.logo, background: logo.fondBlanc === false ? 'transparent' : '#fff', borderRadius: 8 }} />
               ) : null}
               <div style={{ background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', borderRadius: 12, padding: '10px 26px', flex: 1, minWidth: 0 }}>
-                {avecTitre && <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 800 : undefined, letterSpacing: typoModerne ? -0.5 : undefined, fontSize: etroit ? 36 : 42, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: etroit ? 'normal' : 'nowrap', overflow: 'hidden' }}>{titre}</div>}
-                <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 600 : undefined, fontSize: avecTitre ? (etroit ? 20 : 22) : 34, color: styleSauge ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousTitre}</div>
+                {avecTitre && <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 800 : undefined, letterSpacing: typoModerne ? -0.5 : undefined, fontSize: tx.titre, lineHeight: 1.05, color: styleSauge ? '#FFF0D2' : '#0b2a4a', whiteSpace: etroit ? 'normal' : 'nowrap', overflow: 'hidden' }}>
+                  {/* Formats étroits : retour à la ligne après « : » (sinon la coupure tombait sur le trait d'union de « Pyrénées-Orientales »). */}
+                  {etroit && titre.includes(' : ') ? <>{titre.split(' : ')[0]} :<br />{titre.split(' : ').slice(1).join(' : ')}</> : titre}
+                </div>}
+                <div style={{ fontFamily: policeTitres, fontWeight: typoModerne ? 600 : undefined, fontSize: avecTitre ? tx.sous : tx.sousSeul, lineHeight: etroit ? 1.1 : undefined, color: styleSauge ? '#EAF3F8' : '#2563a8', marginTop: avecTitre ? 2 : 0 }}>{sousTitreCarte}</div>
               </div>
             </div>
 
@@ -795,17 +835,23 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                       </g>
                     </svg>
                     {styleFond && <DecorStyle style={styleFond} largeur={largeurCarte} hauteur={hauteurCarte} mer={null} bandes={false} />}
-                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: HAUTEUR_JOUR, background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', color: styleSauge ? '#FFF0D2' : '#0b2a4a', fontFamily: policeTitres, fontWeight: typoModerne ? 700 : undefined, fontSize: typoModerne ? 24 : 22, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5 }}>
+                    <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: hauteurJour, background: styleSauge ? '#102F4C' : 'rgba(255,255,255,0.94)', color: styleSauge ? '#FFF0D2' : '#0b2a4a', fontFamily: policeTitres, fontWeight: typoModerne ? 700 : undefined, fontSize: etroit ? Math.round(Math.max(22, Math.min(tx.jour + 4, largeurCarte * 0.078))) : (typoModerne ? 24 : 22) * (LARGEUR / 1600), display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
                       {jourLibelle(date)}
                     </div>
-                    {styleSauge && zoneCarte === 'dep:66' && (
-                      <svg width={largeurCarte} height={hauteurCarte} aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                        <g fontFamily={typoModerne ? policeValeurs : "Arial, Helvetica, sans-serif"} fontSize={Math.max(10, Math.min(16, largeurCarte * 0.027))} fontWeight={600} letterSpacing={1.5} textAnchor="middle">
-                          <text x={largeurCarte * 0.48} y={hauteurCarte - 16} fill="#52634F" opacity={0.85}>ESPAGNE</text>
-                          <text x={largeurCarte - 20} y={hauteurCarte * 0.4} transform={`rotate(-90 ${largeurCarte - 20} ${hauteurCarte * 0.4})`} fill="#EAF3F8" opacity={0.85} letterSpacing={typoModerne ? 0.5 : 1.5}>MER MÉDITERRANÉE</text>
-                        </g>
-                      </svg>
-                    )}
+                    {styleSauge && zoneCarte === 'dep:66' && (() => {
+                      // Mentions « ESPAGNE » et « MER MÉDITERRANÉE » : lisibles sur téléphone, sans dépasser sur le bandeau du jour.
+                      const taillePays = etroit ? Math.max(16, Math.min(30, largeurCarte * 0.03, ((hauteurCarte - hauteurJour) * 0.8) / 10)) : Math.max(10, Math.min(16, largeurCarte * 0.027));
+                      const yMer = etroit ? hauteurJour + (hauteurCarte - hauteurJour) * 0.5 : hauteurCarte * 0.4;
+                      const xMer = largeurCarte - (etroit ? 24 : 20);
+                      return (
+                        <svg width={largeurCarte} height={hauteurCarte} aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                          <g fontFamily={typoModerne ? policeValeurs : "Arial, Helvetica, sans-serif"} fontSize={taillePays} fontWeight={600} letterSpacing={1.5} textAnchor="middle">
+                            <text x={largeurCarte * 0.48} y={hauteurCarte - (etroit ? 20 : 16)} fill="#52634F" opacity={0.85}>ESPAGNE</text>
+                            <text x={xMer} y={yMer} transform={`rotate(-90 ${xMer} ${yMer})`} fill="#EAF3F8" opacity={0.85} letterSpacing={typoModerne ? 0.5 : 1.5}>MER MÉDITERRANÉE</text>
+                          </g>
+                        </svg>
+                      );
+                    })()}
                     {points.map(({ p, x, y }) => {
                       const cle = `${date}|${p.code}`;
                       const pictoId = surcharges[cle] ?? pictoDuJour(p);
@@ -825,7 +871,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                         {pictoId && estPictoNeige(pictoId) && lpns[cle] && (
                           <span style={{ fontFamily: policeValeurs, fontWeight: 700, fontSize: Math.max(12, Math.round(taillePicto * 0.22)), color: '#0c4a6e', background: '#f0f9ff', borderRadius: 4, padding: '2px 5px', whiteSpace: 'nowrap' }}>LPN : {lpns[cle]} m</span>
                         )}
-                        <span style={{ fontFamily: policeValeurs, fontWeight: typoModerne ? 800 : undefined, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: policeValeurs, fontWeight: typoModerne ? 800 : undefined, fontSize: Math.round(taillePicto * 0.36), color: '#d4101a', textShadow: etroit ? '0 0 3px #fff, 0 0 3px #fff, 0 0 6px rgba(255,255,255,0.9), 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff' : styleSauge ? '0 0 1px #fff, 0 1px 1px rgba(255,255,255,0.7)' : '0 0 3px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff', whiteSpace: 'nowrap' }}>
                           {p.maxi != null ? `${Math.round(p.maxi)}°` : ''}
                           {p.mini != null ? <span style={{ color: '#1f6fe0', fontSize: typoModerne ? '0.8em' : '0.72em' }}>{p.maxi != null ? ' / ' : ''}{Math.round(p.mini)}°</span> : null}
                         </span>
@@ -871,13 +917,16 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
                       <svg width={largeurCarte} height={hauteurCarte} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} role="img" aria-label="Repères : Perpignan, Font-Romeu et Le Boulou">
                         {REPERES_66.map((ville) => {
                           const { x, y } = versEcran(versMonde(ville.lat, ville.lon), vue);
-                          return <circle key={ville.nom} cx={x} cy={y} r={Math.max(2.5, Math.min(4, largeurCarte * 0.006))} fill="#000" stroke="#FFF0D2" strokeWidth={0.8}><title>{ville.nom}</title></circle>;
+                          return <circle key={ville.nom} cx={x} cy={y} r={etroit ? Math.max(5, Math.min(8, largeurCarte * 0.012)) : Math.max(2.5, Math.min(4, largeurCarte * 0.006))} fill="#000" stroke="#FFF0D2" strokeWidth={etroit ? 1.6 : 0.8}><title>{ville.nom}</title></circle>;
                         })}
                       </svg>
                     )}
-                    {premier == null && (
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cfe3fa', fontSize: 16, textAlign: 'center', padding: 20 }}>
-                        {!charge ? 'Chargement…' : vide ? 'Pas encore de prévision pour ce jour' : ''}
+                    {premier == null && (!charge || vide) && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 20 }}>
+                        {/* Pastille sombre : le message restait illisible sur le fond clair du département. */}
+                        <span style={{ background: 'rgba(11,42,74,0.88)', color: '#fff', fontSize: etroit ? 34 : Math.round(18 * (LARGEUR / 1600)), lineHeight: 1.2, padding: etroit ? '12px 24px' : '8px 16px', borderRadius: 12, border: '2px solid rgba(255,255,255,0.7)' }}>
+                          {!charge ? 'Chargement…' : 'Pas encore de prévision pour ce jour'}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -885,7 +934,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
               })}
             </div>
 
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: HAUTEUR_PIED, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${MARGE}px`, gap: 16, fontSize: etroit ? 14 : 16, lineHeight: etroit ? 1.25 : undefined, color: '#cfe3fa' }}>
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: hauteurPied, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${MARGE}px`, gap: 16, fontSize: tx.pied, lineHeight: etroit ? 1.25 : undefined, color: '#cfe3fa' }}>
               <span>
                 Prévisions {modeleActif.libelle} ({modeleActif.fournisseur}){runTexte ? ` · modèle du ${runTexte}` : ''}{couche ? ` · Fond : ${CREDITS_COUCHES[couche]}` : ''}
               </span>
