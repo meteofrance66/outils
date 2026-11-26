@@ -404,7 +404,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
                       {avecRang && (
                         <div style={{ width: 52, flexShrink: 0, fontFamily: st.policeValeur, fontSize: 24, color: st.accent, fontStyle: st.rangItalique ? 'italic' : undefined, fontVariantNumeric: 'tabular-nums', fontWeight: st.typo?.valeur }}>{i + 1}</div>
                       )}
-                      <div style={{ flex: 1, minWidth: 0, fontSize: 24, fontWeight: st.typo?.nom ?? 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: st.typo ? 24 : 26.4, fontWeight: st.typo?.nom ?? 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.nom}</div>
                       <div style={{ width: largeurMesure, display: 'flex', justifyContent: 'center' }}>{valeurDe(l.valeur)}</div>
                     </div>
                   ))}
