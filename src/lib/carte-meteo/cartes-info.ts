@@ -447,11 +447,11 @@ const PALIERS_RISQUE_GEL: Palier[] = [
 ];
 /** Carte « Risque de gel » : températures minimales (°C) de chaque niveau, au dixième près de l'arrondi affiché : faible de +3 à +1, modéré de 0 à -2, fort de -3 à -5, sévère à -6 et moins. */
 const SEUILS_GEL: [number, number, number, number] = [3.49, 0.49, -2.51, -5.51];
-/** Carte « Risque de gel » : faible en bleu, modéré et fort en rouge (le gel qui compte), sévère en violet. */
+/** Carte « Risque de gel » : niveaux en bleus, comme le froid. */
 const PALIERS_GEL_NIVEAUX: Palier[] = [
-  p(4, '#7b2cbf', BLANC, 'Sévère'),
-  p(3, '#a8071a', BLANC, 'Fort'),
-  p(2, '#e5191e', BLANC, 'Modéré'),
+  p(4, '#0a1a5c', BLANC, 'Sévère'),
+  p(3, '#12308f', BLANC, 'Fort'),
+  p(2, '#1a4fc4', BLANC, 'Modéré'),
   p(1, '#2f9bff', BLANC, 'Faible'),
   p(-Infinity, '#e5e7eb', NOIR, 'Pas de risque', true),
 ];
@@ -554,13 +554,13 @@ const PALIERS_FROID_CHIFFRES: Palier[] = [
   p(-9.99, '#1a4fc4', BLANC, 'Fort (≤ -5 °C)'),
   p(-Infinity, '#0a1a5c', BLANC, 'Sévère (≤ -10 °C)'),
 ];
-/** Gel en chiffres (valeurs arrondies à l'affichage), faible en bleu, modéré et fort en rouge : faible de +3 à +1 °C, modéré de 0 à -2 °C, fort de -3 à -5 °C, sévère à -6 °C et moins. */
+/** Gel en chiffres (valeurs arrondies à l'affichage), en bleus : faible de +3 à +1 °C, modéré de 0 à -2 °C, fort de -3 à -5 °C, sévère à -6 °C et moins. */
 const PALIERS_GEL_CHIFFRES: Palier[] = [
   p(3.5, '#e5e7eb', NOIR, 'Pas de risque (≥ 4 °C)', true),
   p(0.5, '#8ec8ff', NOIR, 'Faible (+1 à +3 °C)'),
-  p(-2.5, '#e5191e', BLANC, 'Modéré (0 à -2 °C)'),
-  p(-5.5, '#a8071a', BLANC, 'Fort (-3 à -5 °C)'),
-  p(-Infinity, '#7b2cbf', BLANC, 'Sévère (≤ -6 °C)'),
+  p(-2.5, '#2f9bff', BLANC, 'Modéré (0 à -2 °C)'),
+  p(-5.5, '#1a4fc4', BLANC, 'Fort (-3 à -5 °C)'),
+  p(-Infinity, '#0a1a5c', BLANC, 'Sévère (≤ -6 °C)'),
 ];
 const BRUT_RISQUE: Record<string, NonNullable<ThemePrevision['brut']>> = (() => {
   const vent = (champ: (x: PointCarte) => number | null | undefined, seuils: [number, number, number, number]) => ({ valeur: champ, unite: 'km/h', decimales: 0, paliers: paliersRisque(seuils, 'km/h') });
