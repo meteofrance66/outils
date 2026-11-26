@@ -40,7 +40,7 @@ async function integrerTuiles(noeud: HTMLElement): Promise<() => void> {
  * Exporte la carte en JPG (1,5 × la taille logique : 1280 × 720 → 1920 × 1080). La carte est affichée
  * réduite par une transformation CSS selon la largeur d'écran : on la neutralise sur le clone exporté.
  */
-export async function exporterEnJpg(noeud: HTMLElement, nomFichier: string, largeur: number, hauteur: number): Promise<void> {
+export async function exporterEnJpg(noeud: HTMLElement, nomFichier: string, largeur: number, hauteur: number, fond = '#0b2a4a'): Promise<void> {
   document.documentElement.classList.add('cmap-export-en-cours');
   const remettre = await integrerTuiles(noeud);
   let dataUrl: string;
@@ -51,7 +51,8 @@ export async function exporterEnJpg(noeud: HTMLElement, nomFichier: string, larg
         pixelRatio: 1.5,
         width: largeur,
         height: hauteur,
-        backgroundColor: '#0b2a4a',
+        // Couleur du fond de l'image : html-to-image l'applique à la planche et remplace donc un fond uni de la planche (un dégradé, lui, reste dessus).
+        backgroundColor: fond,
         // Boutons d'édition (suppression d'un picto ajouté…) : jamais sur l'image.
         filter: (n) => !(n instanceof Element && n.classList.contains('cmap-sans-export')),
         style: { transform: 'none', transformOrigin: 'top left' },

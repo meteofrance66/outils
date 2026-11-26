@@ -152,7 +152,7 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
     setErreurExport(null);
     setEnExport(true);
     try {
-      await exporterEnJpg(planchRef.current, `tab-val-${modele.id === 'autre' ? autreId : modele.id}-${st.id}-${normaliser(lieu).replace(/ /g, '-')}-${aujourdhui}`, LARGEUR, hauteur);
+      await exporterEnJpg(planchRef.current, `tab-val-${modele.id === 'autre' ? autreId : modele.id}-${st.id}-${normaliser(lieu).replace(/ /g, '-')}-${aujourdhui}`, LARGEUR, hauteur, st.fond.startsWith('#') ? st.fond : undefined);
     } catch (e) {
       console.error('Export du tableau Tab Val en JPG', e);
       setErreurExport("L'export a échoué. Réessayez dans un instant.");
@@ -359,7 +359,8 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
                 <div style={{ height: 14 }} />
 
                 {/* Lignes */}
-                <div style={{ padding: st.ecart ? `${st.ecart}px ${marge}px 0` : 0 }}>
+                {/* Lignes : de la largeur du bandeau du titre (les rayures des styles « pleine largeur » dépassaient de 36 px à gauche et à droite). */}
+                <div style={{ padding: st.ecart ? `${st.ecart}px ${marge}px 0` : `0 ${marge}px` }}>
                   {lignes.map((l, i) => (
                     <div
                       key={`${l.nom}-${i}`}
@@ -368,7 +369,8 @@ export default function TabVal({ aujourdhui }: { aujourdhui: string }) {
                         marginBottom: st.ecart ? st.ecart : 0,
                         display: 'flex',
                         alignItems: 'center',
-                        padding: st.ecart ? '0 20px' : `0 ${marge}px`,
+                        // Pleine largeur : nom décalé de 18 px dans la rayure ; valeurs et barres alignées sur le bord droit du bandeau.
+                        padding: st.ecart ? '0 20px' : '0 0 0 18px',
                         background: i % 2 === 0 ? st.lignePaire : st.ligneImpaire,
                         borderTop: st.ecart ? 'none' : st.traitLigne,
                         borderRadius: st.ecart ? 14 : 0,

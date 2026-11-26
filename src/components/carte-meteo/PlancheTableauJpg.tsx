@@ -169,7 +169,7 @@ export default function PlancheTableauJpg({ lignes, departements, bilans }: Prop
     setErreurExport(null);
     setEnExport(true);
     try {
-      await exporterEnJpg(planchRef.current, `tableau-${modeleId}-${st.id}-${normaliser(nomZone).replace(/ /g, '-')}-${new Date().toISOString().slice(0, 10)}`, LARGEUR, hauteur);
+      await exporterEnJpg(planchRef.current, `tableau-${modeleId}-${st.id}-${normaliser(nomZone).replace(/ /g, '-')}-${new Date().toISOString().slice(0, 10)}`, LARGEUR, hauteur, st.fond.startsWith('#') ? st.fond : undefined);
     } catch (e) {
       console.error('Export du tableau en JPG', e);
       setErreurExport("L'export a échoué. Réessayez dans un instant.");
