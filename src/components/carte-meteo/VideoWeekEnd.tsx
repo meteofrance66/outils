@@ -162,7 +162,7 @@ function choisirVilles(dep: string, liste: VilleListe[], montagnes: VilleListe[]
 const montagnardes = (liste: VilleListe[], reliefs: VilleListe[], altitudeMin: number): VilleListe[] => [...reliefs, ...liste.filter((v) => (v.altitude ?? 0) >= altitudeMin)];
 /** Accroche du format « TikTok Hook » : « Quel temps chez nous ? » aux couleurs catalanes, avant l'intro. */
 const DUREE_HOOK = 2.5;
-/** Dix accroches d'ouverture (jaune puis rouge) : la 1re est la classique, qui s'adapte au lieu (montagne, côte, France). */
+/** Quinze accroches d'ouverture (jaune puis rouge) : la 1re est la classique, qui s'adapte au lieu (montagne, côte, France). */
 const ACCROCHES: { libelle: string; haut: string; bas: string }[] = [
   { libelle: 'QUEL TEMPS CHEZ NOUS ? (classique)', haut: 'QUEL TEMPS', bas: 'CHEZ NOUS ?' },
   { libelle: 'PARAPLUIE OU LUNETTES ?', haut: 'PARAPLUIE OU', bas: 'LUNETTES ?' },
@@ -174,6 +174,11 @@ const ACCROCHES: { libelle: string; haut: string; bas: string }[] = [
   { libelle: 'LE TEMPS VA-T-IL TENIR ?', haut: 'LE TEMPS', bas: 'VA TENIR ?' },
   { libelle: 'VOTRE MÉTÉO EN 15 SECONDES', haut: 'VOTRE MÉTÉO', bas: 'EN 15 SECONDES' },
   { libelle: 'LA VÉRITÉ SUR LE TEMPS !', haut: 'LA VÉRITÉ', bas: 'SUR LE TEMPS !' },
+  { libelle: 'ON SORT LE PULL ?', haut: 'ON SORT', bas: 'LE PULL ?' },
+  { libelle: 'ÇA VA SE GÂTER ?', haut: 'ÇA VA SE', bas: 'GÂTER ?' },
+  { libelle: 'BEAU TEMPS OU PAS ?', haut: 'BEAU TEMPS', bas: 'OU PAS ?' },
+  { libelle: 'CE QUI VOUS ATTEND !', haut: 'CE QUI VOUS', bas: 'ATTEND !' },
+  { libelle: 'VOUS N’ALLEZ PAS Y CROIRE !', haut: 'VOUS N’ALLEZ', bas: 'PAS Y CROIRE !' },
 ];
 const JAUNE_CATALAN = '#fcdd09';
 const ROUGE_CATALAN = '#da121a';
@@ -2395,7 +2400,7 @@ export default function VideoWeekEnd({
           </select>
         </label>
         <label className="text-sm font-medium">
-          <span className={legende}>Texte de l’accroche (10 au choix)</span>
+          <span className={legende}>Texte de l’accroche (15 au choix)</span>
           <select value={accrocheId} onChange={(e) => setAccrocheId(Number(e.target.value))} className={selectBarre}>
             {ACCROCHES.map((a, k) => (
               <option key={a.libelle} value={k}>
