@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import CarteMeteo, { type DonneesCarte } from '@/components/carte-meteo/CarteMeteo';
 import PlanchesJours from '@/components/carte-meteo/PlanchesJours';
+import PlancheChamps from '@/components/carte-meteo/PlancheChamps';
+import { COORDS_DEPARTEMENTS } from '@/lib/carte-meteo/departements-coords';
+import type { PointChampJour } from '@/lib/carte-meteo/planche-champs';
 import { aujourdhuiParis, ajouterJours } from '@/lib/carte-meteo/previsions-modeles';
 import { versPointJour, type PointJour } from '@/lib/carte-meteo/planches-jours';
 import { chargerPrevisionsCarte, chargerPrevisionsCarteJours } from '@/lib/carte-meteo/sources';
@@ -29,10 +32,24 @@ const JOURS_PLANCHE = 9;
  */
 async function PlancheDemain({ aujourdhui }: { aujourdhui: string }) {
   let jours: Record<string, PointJour[] | null> | null = null;
+  let champs: Record<string, PointChampJour[] | null> = {};
   try {
     const dates = Array.from({ length: JOURS_PLANCHE }, (_, k) => ajouterJours(aujourdhui, k));
     const brut = await chargerPrevisionsCarteJours('cep', dates, false);
     jours = Object.fromEntries(dates.map((d) => [d, brut[d] ? brut[d]!.map(versPointJour).filter((x): x is PointJour => x != null) : null]));
+    // Cartes en couleurs : maxi, mini, pluie et rafales de chaque département, à la position de la commune qui donne les valeurs.
+    champs = Object.fromEntries(
+      dates.map((d) => [
+        d,
+        brut[d]
+          ? brut[d]!.flatMap((p) => {
+              const lat = p.lat ?? COORDS_DEPARTEMENTS[p.code]?.lat;
+              const lon = p.lon ?? COORDS_DEPARTEMENTS[p.code]?.lon;
+              return lat == null || lon == null ? [] : [{ code: p.code, lat, lon, tx: p.maxi, tn: p.mini, pluie: p.pluieJournee, rafale: p.rafaleJournee }];
+            })
+          : null,
+      ])
+    );
   } catch (e) {
     console.error('Carte météo : planche de 2 et 4 jours indisponible', e);
   }
@@ -44,15 +61,20 @@ async function PlancheDemain({ aujourdhui }: { aujourdhui: string }) {
     );
   }
   return (
-    <PlanchesJours
-      aujourdhui={aujourdhui}
-      modele={{ id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' }}
-      jours={jours}
-      fondCarteMeteo
-      departInitial={1}
-      durees={[2, 4]}
-      periodeInitiale="apres-midi-mini-maxi"
-    />
+    <>
+      <PlanchesJours
+        aujourdhui={aujourdhui}
+        modele={{ id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' }}
+        jours={jours}
+        fondCarteMeteo
+        departInitial={1}
+        durees={[2, 4]}
+        periodeInitiale="apres-midi-mini-maxi"
+      />
+      <div className="mt-12">
+        <PlancheChamps aujourdhui={aujourdhui} jours={champs} modele="CEP" />
+      </div>
+    </>
   );
 }
 
