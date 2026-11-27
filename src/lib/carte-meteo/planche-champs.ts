@@ -11,6 +11,8 @@ export type ThemeChamp = 'tx' | 'tn' | 'pluie' | 'rafales';
 /** Prévision d'un département pour un jour (valeurs du chef-lieu). */
 export interface PointChampJour {
   code: string;
+  /** Ville dont viennent les valeurs (chiffres clés de la vidéo). */
+  nom?: string;
   lat: number;
   lon: number;
   tx: number | null;
@@ -147,8 +149,8 @@ export const jourLong = (iso: string) => `${NOMS_JOURS[jourSemaine(iso)]} ${quan
 /** « DU 28 AU 29 NOVEMBRE » ou « DU 30 NOVEMBRE AU 1ER DÉCEMBRE » */
 export const plageCourte = (a: string, b: string) => (mois(a) === mois(b) ? `DU ${quantieme(a)} AU ${quantieme(b)} ${mois(b)}` : `DU ${quantieme(a)} ${mois(a)} AU ${quantieme(b)} ${mois(b)}`);
 /** Titre automatique de la planche (deux lignes). */
-export const titreAuto = (theme: ThemeChamp, jours: string[]): [string, string] => [
-  THEMES_CHAMPS[theme].titre,
+export const titreAuto = (theme: ThemeChamp, jours: string[], zone?: string): [string, string] => [
+  zone ? `${THEMES_CHAMPS[theme].titre} : ${zone}` : THEMES_CHAMPS[theme].titre,
   jours.length === 2 && mois(jours[0]) === mois(jours[1])
     ? `${NOMS_JOURS[jourSemaine(jours[0])]} ${quantieme(jours[0])} ET ${NOMS_JOURS[jourSemaine(jours[1])]} ${quantieme(jours[1])} ${mois(jours[1])}`
     : jours.length === 2
@@ -158,7 +160,7 @@ export const titreAuto = (theme: ThemeChamp, jours: string[]): [string, string] 
 
 // ── Champ, isolignes, étiquettes ────────────────────────────────────────────────────────────────────────────────────────
 
-interface Rect {
+export interface Rect {
   x: number;
   y: number;
   w: number;
@@ -177,20 +179,20 @@ interface Grille {
   terre: Uint8Array;
 }
 
-/** Rayon du lissage (km) : un peu moins que l'écart entre deux chefs-lieux voisins. */
-const SIGMA_KM = 48;
+/** Rayon du lissage (km), France entière : un peu moins que l'écart entre deux chefs-lieux voisins. */
+export const SIGMA_FRANCE_KM = 48;
 
-/** Valeurs aux nœuds d'une grille couvrant `r` : moyenne des départements pondérée par une gaussienne de la distance. */
-function calculerGrille(points: PointChampJour[], theme: DefTheme, vue: Vue, r: Rect, pas: number, terres: Path2D): Grille | null {
+/** Valeurs aux nœuds d'une grille couvrant `r` : moyenne des points pondérée par une gaussienne de la distance. */
+function calculerGrille(points: PointChampJour[], theme: DefTheme, vue: Vue, r: Rect, pas: number, terres: Path2D, sigmaKm: number): Grille | null {
   const pts = points.flatMap((p) => {
     const v = theme.valeur(p);
     if (v == null || !Number.isFinite(v)) return [];
     const e = versEcran(versMonde(p.lat, p.lon), vue);
     return [{ x: e.x, y: e.y, v }];
   });
-  if (pts.length < 10) return null;
+  if (pts.length < 6) return null;
   const pxKm = Math.abs(versEcran(versMonde(46, 2), vue).y - versEcran(versMonde(46 + 1 / 111.2, 2), vue).y);
-  const s2 = 2 * (SIGMA_KM * pxKm) ** 2;
+  const s2 = 2 * (sigmaKm * pxKm) ** 2;
   const nx = Math.ceil(r.w / pas) + 1;
   const ny = Math.ceil(r.h / pas) + 1;
   const v = new Float32Array(nx * ny);
@@ -434,12 +436,18 @@ function placerEtiquettes(ctx: CanvasRenderingContext2D, g: Grille, niveaux: num
 // ── Planche ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface GeoChamps {
-  /** Contours des départements (pixels monde). */
+  /** Limites intérieures (départements ; pixels monde). */
   departements: Path2D[];
-  /** Union des départements. */
+  /** Zone coloriée (France, ou un département). */
   terres: Path2D;
-  /** Cadre de la France (pixels monde). */
+  /** Cadre de la zone (pixels monde). */
   boite: Boite;
+  /** Terres autour de la zone (pays et départements voisins), en gris foncé. */
+  voisins?: Path2D[];
+  /** Rayon du lissage (km). */
+  sigmaKm: number;
+  /** Villes repères (point et nom). */
+  villes?: { nom: string; lat: number; lon: number }[];
 }
 
 export interface ParamsPlancheChamps {
@@ -458,7 +466,7 @@ const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 const VIOLET = '#3b2a8a';
 
 /** Texte centré, réduit pour tenir dans `largeurMax`. */
-function texteAjuste(ctx: CanvasRenderingContext2D, texte: string, x: number, y: number, taille: number, largeurMax: number, police = POLICE, graisse = '') {
+export function texteAjuste(ctx: CanvasRenderingContext2D, texte: string, x: number, y: number, taille: number, largeurMax: number, police = POLICE, graisse = '') {
   let t = Math.round(taille);
   ctx.font = `${graisse} ${t}px ${police}`;
   while (ctx.measureText(texte).width > largeurMax && t > 12) {
@@ -468,7 +476,7 @@ function texteAjuste(ctx: CanvasRenderingContext2D, texte: string, x: number, y:
   ctx.fillText(texte, x, y);
 }
 
-function fondCiel(ctx: CanvasRenderingContext2D, W: number, H: number) {
+export function fondCiel(ctx: CanvasRenderingContext2D, W: number, H: number) {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#2c69c9');
   g.addColorStop(0.5, '#5b9fe8');
@@ -493,7 +501,50 @@ function fondCiel(ctx: CanvasRenderingContext2D, W: number, H: number) {
   }
 }
 
-function echelleCouleurs(ctx: CanvasRenderingContext2D, theme: DefTheme, r: Rect) {
+/** Hauteur du bandeau rouge pour une image de hauteur H. */
+export const hauteurBandeau = (H: number) => Math.round(Math.min(200, Math.max(130, H * 0.1)));
+
+/** Bandeau rouge du titre (deux lignes). */
+export function bandeau(ctx: CanvasRenderingContext2D, W: number, hb: number, titre: [string, string]) {
+  const gb = ctx.createLinearGradient(0, 0, 0, hb);
+  gb.addColorStop(0, '#f2423a');
+  gb.addColorStop(1, '#c9151c');
+  ctx.fillStyle = gb;
+  ctx.fillRect(0, 0, W, hb);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(0, hb, W, 6);
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(80,0,0,0.6)';
+  ctx.shadowOffsetY = 3;
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = '#ffffff';
+  texteAjuste(ctx, titre[0], W / 2, hb * 0.44, hb * 0.34, W - 50);
+  texteAjuste(ctx, titre[1], W / 2, hb * 0.86, hb * 0.3, W - 50);
+  ctx.restore();
+}
+
+/** Pied de page : site et source. */
+export const HAUTEUR_PIED = 50;
+export function pied(ctx: CanvasRenderingContext2D, W: number, H: number, source: string) {
+  const hp = HAUTEUR_PIED;
+  ctx.fillStyle = 'rgba(8,24,60,0.55)';
+  ctx.fillRect(0, H - hp, W, hp);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 26px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('www.alertes-meteo.com', 20, H - hp / 2 + 9);
+  ctx.textAlign = 'right';
+  ctx.font = '19px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(source, W - 20, H - hp / 2 + 7);
+  ctx.textAlign = 'left';
+}
+
+export const HAUTEUR_ECHELLE = 108;
+
+export function echelleCouleurs(ctx: CanvasRenderingContext2D, idTheme: ThemeChamp, r: Rect) {
+  const theme = THEMES_CHAMPS[idTheme];
   ctx.fillStyle = 'rgba(12,14,30,0.88)';
   ctx.beginPath();
   ctx.roundRect(r.x, r.y, r.w, r.h, 12);
@@ -525,26 +576,45 @@ function echelleCouleurs(ctx: CanvasRenderingContext2D, theme: DefTheme, r: Rect
   ctx.textAlign = 'left';
 }
 
-/** Une carte : champ coloré sur les terres, isolignes, départements, étiquettes, puis l'étiquette du jour. */
-function carte(ctx: CanvasRenderingContext2D, theme: DefTheme, niveaux: number[], points: PointChampJour[] | null, iso: string, r: Rect, geo: GeoChamps, coinJour: 'gauche' | 'droite') {
+/** Nom court d'une ville repère. */
+const nomCourt = (nom: string) => nom.replace('Font-Romeu-Odeillo-Via', 'Font-Romeu').replace(/^Saint-/, 'St-').replace(/-sur-Mer$/, '');
+
+/**
+ * Une carte : terres voisines, champ coloré sur la zone, isolignes, limites, villes repères, étiquettes de fourchette, puis le jour.
+ * `jour` : étiquette violette dans un coin (null : aucune).
+ */
+export function carteChamp(ctx: CanvasRenderingContext2D, idTheme: ThemeChamp, niveaux: number[], points: PointChampJour[] | null, iso: string, r: Rect, geo: GeoChamps, coinJour: 'gauche' | 'droite' | null) {
+  const theme = THEMES_CHAMPS[idTheme];
   ctx.save();
   ctx.beginPath();
   ctx.rect(r.x, r.y, r.w, r.h);
   ctx.clip();
-  const vue = ajusterVue(geo.boite, { gauche: r.x, haut: r.y, droite: r.x + r.w, bas: r.y + r.h }, 0.015);
-  const taille = Math.min(1.25, Math.max(0.75, r.w / 520));
+  const vue = ajusterVue(geo.boite, { gauche: r.x, haut: r.y, droite: r.x + r.w, bas: r.y + r.h }, geo.voisins ? 0.02 : 0.015);
+  const taille = Math.min(1.35, Math.max(0.75, Math.min(r.w, r.h * 1.1) / 520));
   const pas = 5;
-  const g = points ? calculerGrille(points, theme, vue, r, pas, geo.terres) : null;
-  const terresVue = () => {
+  const g = points ? calculerGrille(points, theme, vue, r, pas, geo.terres, geo.sigmaKm) : null;
+  const versVue = () => {
     ctx.translate(vue.tx, vue.ty);
     ctx.scale(vue.echelle, vue.echelle);
   };
+  if (geo.voisins) {
+    ctx.save();
+    versVue();
+    ctx.fillStyle = '#2b2d38';
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1 / vue.echelle;
+    for (const v of geo.voisins) {
+      ctx.fill(v);
+      ctx.stroke(v);
+    }
+    ctx.restore();
+  }
   // Étiquette du jour (violette, dans un coin) : réservée avant les étiquettes de fourchette.
   ctx.font = `${Math.round(30 * taille)}px ${POLICE}`;
   const texteJour = jourCourt(iso);
   const lj = ctx.measureText(texteJour).width + 28 * taille;
   const hj = 48 * taille;
-  const boiteJour = { x: coinJour === 'gauche' ? r.x : r.x + r.w - lj, y: r.y, w: lj, h: hj };
+  const boiteJour = coinJour ? { x: coinJour === 'gauche' ? r.x : r.x + r.w - lj, y: r.y, w: lj, h: hj } : null;
   if (g) {
     const img = document.createElement('canvas');
     img.width = g.nx;
@@ -559,10 +629,9 @@ function carte(ctx: CanvasRenderingContext2D, theme: DefTheme, niveaux: number[]
       data.data[k * 4 + 3] = 255;
     }
     ic.putImageData(data, 0, 0);
-    // Champ découpé sur les terres.
+    // Champ découpé sur la zone.
     ctx.save();
-    ctx.translate(vue.tx, vue.ty);
-    ctx.scale(vue.echelle, vue.echelle);
+    versVue();
     ctx.clip(geo.terres);
     ctx.scale(1 / vue.echelle, 1 / vue.echelle);
     ctx.translate(-vue.tx, -vue.ty);
@@ -586,9 +655,9 @@ function carte(ctx: CanvasRenderingContext2D, theme: DefTheme, niveaux: number[]
     }
     ctx.restore();
   }
-  // Départements et contour de la France.
+  // Limites intérieures et contour de la zone.
   ctx.save();
-  terresVue();
+  versVue();
   ctx.lineJoin = 'round';
   ctx.strokeStyle = 'rgba(20,10,10,0.32)';
   ctx.lineWidth = 0.6 / vue.echelle;
@@ -597,7 +666,19 @@ function carte(ctx: CanvasRenderingContext2D, theme: DefTheme, niveaux: number[]
   ctx.lineWidth = 1.6 / vue.echelle;
   ctx.stroke(geo.terres);
   ctx.restore();
-  if (g) placerEtiquettes(ctx, g, niveaux, theme, r, taille, [boiteJour]);
+  // Villes repères : point blanc et nom, réservés avant les étiquettes.
+  const interdits: Rect[] = boiteJour ? [boiteJour] : [];
+  const reperes: { x: number; y: number; nom: string; gauche: boolean }[] = [];
+  ctx.font = `bold ${Math.round(18 * taille)}px Arial, sans-serif`;
+  for (const v of geo.villes ?? []) {
+    const e = versEcran(versMonde(v.lat, v.lon), vue);
+    const nom = nomCourt(v.nom);
+    const l = ctx.measureText(nom).width;
+    const gauche = e.x + l + 14 * taille > r.x + r.w - 6;
+    reperes.push({ x: e.x, y: e.y, nom, gauche });
+    interdits.push({ x: gauche ? e.x - l - 14 * taille : e.x - 6 * taille, y: e.y - 12 * taille, w: l + 20 * taille, h: 24 * taille });
+  }
+  if (g) placerEtiquettes(ctx, g, niveaux, theme, r, taille, interdits);
   else {
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
@@ -605,23 +686,46 @@ function carte(ctx: CanvasRenderingContext2D, theme: DefTheme, niveaux: number[]
     ctx.fillText('Prévision indisponible', r.x + r.w / 2, r.y + r.h / 2);
     ctx.textAlign = 'left';
   }
-  // Jour.
-  ctx.fillStyle = VIOLET;
-  ctx.beginPath();
-  ctx.roundRect(boiteJour.x, boiteJour.y, lj, hj, coinJour === 'gauche' ? [0, 0, 10 * taille, 0] : [0, 0, 0, 10 * taille]);
-  ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `${Math.round(30 * taille)}px ${POLICE}`;
-  ctx.fillText(texteJour, boiteJour.x + lj / 2, boiteJour.y + hj / 2 + 1);
+  ctx.lineJoin = 'round';
+  for (const p of reperes) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5 * taille, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#111';
+    ctx.stroke();
+    ctx.font = `bold ${Math.round(18 * taille)}px Arial, sans-serif`;
+    ctx.textAlign = p.gauche ? 'right' : 'left';
+    const tx = p.gauche ? p.x - 9 * taille : p.x + 9 * taille;
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeText(p.nom, tx, p.y);
+    ctx.fillText(p.nom, tx, p.y);
+  }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
+  // Jour.
+  if (boiteJour) {
+    ctx.fillStyle = VIOLET;
+    ctx.beginPath();
+    ctx.roundRect(boiteJour.x, boiteJour.y, lj, hj, coinJour === 'gauche' ? [0, 0, 10 * taille, 0] : [0, 0, 0, 10 * taille]);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${Math.round(30 * taille)}px ${POLICE}`;
+    ctx.fillText(texteJour, boiteJour.x + lj / 2, boiteJour.y + hj / 2 + 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  }
   ctx.restore();
 }
 
-/** Valeurs extrêmes (terres) de toute la planche : les mêmes isolignes pour toutes les cartes. */
-function extremes(theme: DefTheme, jours: ParamsPlancheChamps['jours']): [number, number] {
+/** Niveaux des isolignes de toute la planche (valeurs extrêmes de tous les jours) : les mêmes lignes sur toutes les cartes. */
+export function niveauxPlanche(idTheme: ThemeChamp, jours: ParamsPlancheChamps['jours']): number[] {
+  const theme = THEMES_CHAMPS[idTheme];
   let min = Infinity;
   let max = -Infinity;
   for (const j of jours) {
@@ -632,85 +736,68 @@ function extremes(theme: DefTheme, jours: ParamsPlancheChamps['jours']): [number
       max = Math.max(max, v);
     }
   }
-  return Number.isFinite(min) ? [min, max] : [0, 0];
+  return Number.isFinite(min) ? theme.niveaux(min, max) : [];
+}
+
+/** Rapport largeur / hauteur de la zone à l'écran. */
+export const rapportZone = (b: Boite) => (b.maxX - b.minX) / Math.max(1, b.maxY - b.minY);
+
+/** Titre violet d'un cadre. */
+export function titreCadre(ctx: CanvasRenderingContext2D, texte: string, r: Rect) {
+  ctx.fillStyle = VIOLET;
+  ctx.beginPath();
+  ctx.roundRect(r.x, r.y, r.w, r.h, [12, 12, 0, 0]);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  texteAjuste(ctx, texte, r.x + r.w / 2, r.y + r.h * 0.72, r.h * 0.6, r.w - 30);
+  ctx.textAlign = 'left';
 }
 
 export function dessinerPlancheChamps({ ctx, largeur: W, hauteur: H, theme: idTheme, jours, titre, geo, source }: ParamsPlancheChamps) {
   const theme = THEMES_CHAMPS[idTheme];
-  const [min, max] = extremes(theme, jours);
-  const niveaux = theme.niveaux(min, max);
+  const niveaux = niveauxPlanche(idTheme, jours);
   ctx.save();
   fondCiel(ctx, W, H);
+  const hb = hauteurBandeau(H);
+  bandeau(ctx, W, hb, titre);
 
-  // Bandeau rouge du titre.
-  const hb = Math.round(Math.min(200, Math.max(130, H * 0.1)));
-  const gb = ctx.createLinearGradient(0, 0, 0, hb);
-  gb.addColorStop(0, '#f2423a');
-  gb.addColorStop(1, '#c9151c');
-  ctx.fillStyle = gb;
-  ctx.fillRect(0, 0, W, hb);
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fillRect(0, hb, W, 6);
-  ctx.textAlign = 'center';
-  ctx.shadowColor = 'rgba(80,0,0,0.6)';
-  ctx.shadowOffsetY = 3;
-  ctx.shadowBlur = 4;
-  ctx.fillStyle = '#ffffff';
-  texteAjuste(ctx, titre[0], W / 2, hb * 0.44, hb * 0.34, W - 50);
-  texteAjuste(ctx, titre[1], W / 2, hb * 0.86, hb * 0.3, W - 50);
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
-  ctx.textAlign = 'left';
-
-  // Mise en page : cartes par deux côte à côte ; 2 jours en format haut : une carte par cadre, l'une sous l'autre (plus grandes).
+  // Mise en page : une ou deux cartes par cadre, selon ce qui donne les plus grandes cartes (France : par deux ; département allongé : une par cadre).
   const pad = 20;
-  const hl = 108;
-  const hp = 50;
+  const hl = HAUTEUR_ECHELLE;
+  const hp = HAUTEUR_PIED;
   const ht = 56;
-  const parCadre = jours.length === 2 && H / W > 1.5 ? 1 : 2;
-  const cadres: (typeof jours)[] = [];
-  for (let k = 0; k < jours.length; k += parCadre) cadres.push(jours.slice(k, k + parCadre));
-  const n = cadres.length;
-  const largeurCarte = (W - 2 * pad) / parCadre;
-  const gapMin = 16;
-  const dispo = H - hb - 6 - hl - hp - (n + 2) * gapMin - n * ht;
-  const hCarte = Math.min(largeurCarte * (parCadre === 1 ? 0.92 : 0.98), dispo / n);
+  const gapMin = 14;
+  const a = rapportZone(geo.boite) * (geo.voisins ? 1.05 : 1);
+  const essai = (parCadre: number) => {
+    const n = Math.ceil(jours.length / parCadre);
+    const dispo = H - hb - 6 - hl - hp - (n + 2) * gapMin - n * ht;
+    const lc = (W - 2 * pad) / parCadre;
+    const hc = dispo / n;
+    return { parCadre, n, lc, hc, echelle: Math.min(lc / a, hc), dispo };
+  };
+  const choix = [essai(2), essai(1)].reduce((m, e) => (e.echelle > m.echelle * 1.05 ? e : m));
+  const { parCadre, n, lc: largeurCarte, dispo } = choix;
+  // Hauteur des cartes : la zone entière à la largeur disponible (un peu plus pour la France, qui est presque carrée), sans dépasser la place.
+  const hCarte = Math.min(Math.max(largeurCarte / a, largeurCarte * 0.5) * (geo.voisins ? 1.06 : 0.98), dispo / n);
   const reste = dispo - n * hCarte;
   const gap = gapMin + reste / (n + 2);
+  const cadres: (typeof jours)[] = [];
+  for (let k = 0; k < jours.length; k += parCadre) cadres.push(jours.slice(k, k + parCadre));
   let y = hb + 6 + gap;
-  echelleCouleurs(ctx, theme, { x: pad, y, w: W - 2 * pad, h: hl });
+  echelleCouleurs(ctx, idTheme, { x: pad, y, w: W - 2 * pad, h: hl });
   y += hl + gap;
   for (const cadre of cadres) {
-    // Titre violet du cadre.
-    ctx.fillStyle = VIOLET;
-    ctx.beginPath();
-    ctx.roundRect(pad, y, W - 2 * pad, ht, [12, 12, 0, 0]);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
     const libelle = cadre.length === 1 ? `${theme.titre} · ${jourLong(cadre[0].iso)}` : `${theme.titre} ${plageCourte(cadre[0].iso, cadre[cadre.length - 1].iso)}`;
-    texteAjuste(ctx, libelle, W / 2, y + ht * 0.72, ht * 0.6, W - 2 * pad - 30);
-    ctx.textAlign = 'left';
+    titreCadre(ctx, libelle, { x: pad, y, w: W - 2 * pad, h: ht });
     y += ht;
     ctx.fillStyle = '#0c0c12';
     ctx.beginPath();
     ctx.roundRect(pad, y, W - 2 * pad, hCarte, [0, 0, 12, 12]);
     ctx.fill();
-    cadre.forEach((j, k) => carte(ctx, theme, niveaux, j.points, j.iso, { x: pad + k * largeurCarte, y, w: largeurCarte, h: hCarte }, geo, k === 0 ? 'gauche' : 'droite'));
+    cadre.forEach((j, k) => carteChamp(ctx, idTheme, niveaux, j.points, j.iso, { x: pad + k * largeurCarte, y, w: largeurCarte, h: hCarte }, geo, k === 0 ? 'gauche' : 'droite'));
     y += hCarte + gap;
   }
-
-  // Pied : site et source.
-  ctx.fillStyle = 'rgba(8,24,60,0.55)';
-  ctx.fillRect(0, H - hp, W, hp);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 26px Arial, sans-serif';
-  ctx.fillText('www.alertes-meteo.com', pad, H - hp / 2 + 9);
-  ctx.textAlign = 'right';
-  ctx.font = '19px Arial, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillText(source, W - pad, H - hp / 2 + 7);
-  ctx.textAlign = 'left';
+  pied(ctx, W, H, source);
   ctx.restore();
 }

@@ -45,7 +45,7 @@ async function PlancheDemain({ aujourdhui }: { aujourdhui: string }) {
           ? brut[d]!.flatMap((p) => {
               const lat = p.lat ?? COORDS_DEPARTEMENTS[p.code]?.lat;
               const lon = p.lon ?? COORDS_DEPARTEMENTS[p.code]?.lon;
-              return lat == null || lon == null ? [] : [{ code: p.code, lat, lon, tx: p.maxi, tn: p.mini, pluie: p.pluieJournee, rafale: p.rafaleJournee }];
+              return lat == null || lon == null ? [] : [{ code: p.code, nom: p.ville ?? p.nom, lat, lon, tx: p.maxi, tn: p.mini, pluie: p.pluieJournee, rafale: p.rafaleJournee }];
             })
           : null,
       ])

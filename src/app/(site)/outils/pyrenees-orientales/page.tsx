@@ -6,6 +6,7 @@ import BilanMoisPlanche from '@/components/carte-meteo/BilanMoisPlanche';
 import CarteMeteo from '@/components/carte-meteo/CarteMeteo';
 import CartesInfo from '@/components/carte-meteo/CartesInfo';
 import PlanchesJours from '@/components/carte-meteo/PlanchesJours';
+import PlancheChamps from '@/components/carte-meteo/PlancheChamps';
 import { aujourdhuiParis, estModele, MODELES, type ModeleSource } from '@/lib/carte-meteo/previsions-modeles';
 import { chargerSeriesAnimation, type SeriesAnimation } from '@/lib/carte-meteo/sources';
 
@@ -47,6 +48,7 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
         {[
           ['#carte', 'Carte du jour'],
           ['#planche', 'Planche et tableau'],
+          ['#planche-champs', 'Cartes en couleurs'],
           ['#infos', 'Cartes infos'],
           ['#animation-releves', 'Relevés animés'],
           ['#animation', 'Animations'],
@@ -66,7 +68,11 @@ export default async function PagePyreneesOrientales({ searchParams }: { searchP
       </div>
 
       <div id="planche" className="mt-12 scroll-mt-4">
-        <PlanchesJours aujourdhui={aujourdhui} modele={{ id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' }} jours={{}} modelesChoix={MODELES_PLANCHE} zoneInitiale={`dep:${DEPARTEMENT}`} departInitial={2} logoInitial="pays-catalan-hd" styleInitial="mediterranee-sauge" />
+        <PlanchesJours aujourdhui={aujourdhui} modele={{ id: 'cep', libelle: 'CEP', fournisseur: 'ECMWF' }} jours={{}} modelesChoix={MODELES_PLANCHE} zoneInitiale={`dep:${DEPARTEMENT}`} departInitial={2} logoInitial="pays-catalan-hd" styleInitial="mediterranee-sauge" lienVers={{ ancre: 'planche-champs', texte: '🎨 Cartes en couleurs (maxi, mini, pluie, rafales) ↓' }} />
+      </div>
+
+      <div className="mt-12">
+        <PlancheChamps aujourdhui={aujourdhui} departement={DEPARTEMENT} modele="CEP" modeleApi="cep" />
       </div>
 
       <h2 id="infos" className="mt-12 scroll-mt-4 text-2xl font-extrabold">
