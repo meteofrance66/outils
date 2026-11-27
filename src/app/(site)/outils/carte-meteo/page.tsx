@@ -70,6 +70,7 @@ async function PlancheDemain({ aujourdhui }: { aujourdhui: string }) {
         departInitial={1}
         durees={[2, 4]}
         periodeInitiale="apres-midi-mini-maxi"
+        lienVers={{ ancre: 'planche-champs', texte: '🎨 Cartes en couleurs (maxi, mini, pluie, rafales) ↓' }}
       />
       <div className="mt-12">
         <PlancheChamps aujourdhui={aujourdhui} jours={champs} modele="CEP" />

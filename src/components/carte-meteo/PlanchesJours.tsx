@@ -100,13 +100,15 @@ interface Props {
   durees?: readonly number[];
   /** Moment de la journée choisi à l'ouverture de la page (« journée » par défaut). */
   periodeInitiale?: PeriodePlanche;
+  /** Bouton à côté de l'export qui mène à une autre section de la page (ancre et texte). */
+  lienVers?: { ancre: string; texte: string };
 }
 
 /**
  * Planches « jours » : un seul JPG avec une carte par jour (2 cartes pour 2 jours, 4 pour 4… 16 pour 16 jours), pour la France, une
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
-export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false, departInitial = 1, logoInitial = 'alertesmeteo', styleInitial, modelesChoix, formatInitial = 'paysage', durees = DUREES_TENDANCES, periodeInitiale = 'journee' }: Props) {
+export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false, departInitial = 1, logoInitial = 'alertesmeteo', styleInitial, modelesChoix, formatInitial = 'paysage', durees = DUREES_TENDANCES, periodeInitiale = 'journee', lienVers }: Props) {
   const [jeuAlertes, setJeuAlertes] = useJeuAlertes();
   const [modeleId, setModeleId] = useState<string>(modele.id);
   const [formatChoisi, setFormatChoisi] = useState<FormatPlanche>(formatInitial);
@@ -810,6 +812,11 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
         <button type="button" onClick={exporter} disabled={enExport || contours.length === 0} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
           {enExport ? 'Export en cours…' : 'Exporter la planche en JPG'}
         </button>
+        {lienVers && (
+          <a href={`#${lienVers.ancre}`} className="rounded-lg border-2 border-primary bg-surface px-5 py-2 text-sm font-semibold text-primary hover:bg-primary hover:text-white">
+            {lienVers.texte}
+          </a>
+        )}
       </div>
       <div className="mt-3">
         <TexteSurCarte cible={planchRef} donnees={donneesTexte} />

@@ -80,7 +80,7 @@ export default function PlancheChamps({ aujourdhui, jours, modele }: { aujourdhu
   };
 
   return (
-    <section id="planche-champs">
+    <section id="planche-champs" className="scroll-mt-20">
       <h2 className="text-2xl font-extrabold">France : cartes en couleurs sur 2 ou 4 jours</h2>
       <p className="mt-2 max-w-3xl text-muted">
         Une carte de France par jour, en couleurs, avec les lignes de même valeur et les fourchettes écrites dessus (« 22 à 24 °C ») : températures maxi ou mini, pluie, rafales.
