@@ -21,8 +21,12 @@ import {
 } from './planche-champs';
 
 const DUREE_INTRO = 2.4;
-const DUREE_JOUR = 3.4;
-const DUREE_FIN = 3.4;
+const DUREE_JOUR_DEFAUT = 3.4;
+const DUREE_FIN_DEFAUT = 3.4;
+/** Durée de la vidéo (hors « Abonnez-vous ! ») quand on n'en demande pas : ouverture, une carte de 3,4 s par jour, planche. */
+export const dureeParDefautChamps = (nbJours: number) => DUREE_INTRO + nbJours * DUREE_JOUR_DEFAUT + DUREE_FIN_DEFAUT;
+/** Durée la plus courte permise (hors « Abonnez-vous ! ») : 2 s par carte au moins. */
+export const dureeMiniChamps = (nbJours: number) => DUREE_INTRO + nbJours * 2 + 2.5;
 const POLICE = "Impact, 'Arial Narrow Bold', 'Arial Black', sans-serif";
 
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
@@ -62,7 +66,8 @@ export interface VideoChamps {
   dessiner: (ctx: CanvasRenderingContext2D, t: number) => void;
 }
 
-type Params = Omit<ParamsPlancheChamps, 'ctx'> & { zone: string };
+/** `duree` : durée voulue de la vidéo en secondes, hors « Abonnez-vous ! » (absente : durée par défaut) ; elle s'ajuste en allongeant chaque carte. */
+type Params = Omit<ParamsPlancheChamps, 'ctx'> & { zone: string; duree?: number };
 
 export function preparerVideoChamps(p: Params): VideoChamps {
   const { largeur: W, hauteur: H, theme, jours, titre, geo, source, zone } = p;
@@ -106,7 +111,10 @@ export function preparerVideoChamps(p: Params): VideoChamps {
 
   const faits = jours.map((j) => chiffresCles(theme, j.points));
   const n = jours.length;
-  const duree = DUREE_INTRO + n * DUREE_JOUR + DUREE_FIN;
+  const duree = Math.max(dureeMiniChamps(n), p.duree ?? dureeParDefautChamps(n));
+  // Les secondes en plus vont aux cartes (et un peu à la planche finale, qui reste affichée plus longtemps).
+  const DUREE_FIN = duree > dureeParDefautChamps(n) ? Math.max(DUREE_FIN_DEFAUT, duree * 0.12) : DUREE_FIN_DEFAUT;
+  const DUREE_JOUR = (duree - DUREE_INTRO - DUREE_FIN) / n;
 
   const dessiner = (ctx: CanvasRenderingContext2D, t: number) => {
     ctx.save();

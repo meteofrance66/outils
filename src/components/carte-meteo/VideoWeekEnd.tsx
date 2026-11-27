@@ -14,7 +14,7 @@ import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import { SEUIL_COTE_KM, chargerCote, distanceCoteKm, secteurDe } from '@/lib/carte-meteo/secteurs';
 import { chargerJoursChamps } from '@/lib/carte-meteo/donnees-champs';
 import { THEMES_CHAMPS, jourLong as jourLongChamps, titreAuto as titreAutoChamps, type PointChampJour, type ThemeChamp } from '@/lib/carte-meteo/planche-champs';
-import { preparerVideoChamps, type VideoChamps } from '@/lib/carte-meteo/video-champs';
+import { dureeMiniChamps, dureeParDefautChamps, preparerVideoChamps, type VideoChamps } from '@/lib/carte-meteo/video-champs';
 import { REPERES_66, useGeoChamps, type VilleRepere } from './useGeoChamps';
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, canEncodeAudio, canEncodeVideo } from 'mediabunny';
 
@@ -2015,6 +2015,11 @@ export default function VideoWeekEnd({
   const [nbJoursChamps, setNbJoursChamps] = useState<2 | 4>(4);
   const [departChamps, setDepartChamps] = useState(1);
   const departChampsEff = Math.min(departChamps, 9 - nbJoursChamps);
+  // Durée totale voulue (60 s au plus, « Abonnez-vous ! » compris) ; le contenu en est le reste.
+  const [dureeChamps, setDureeChamps] = useState(20);
+  const dureeMiniTotale = Math.ceil(dureeMiniChamps(nbJoursChamps) + (abonne ? DUREE_ABONNE : 0));
+  const dureeChampsEff = Math.min(60, Math.max(dureeMiniTotale, dureeChamps));
+  const dureeContenuChamps = dureeChampsEff - (abonne ? DUREE_ABONNE : 0);
   const joursChamps = useMemo(() => Array.from({ length: nbJoursChamps }, (_, k) => ajouterJours(aujourdhui, departChampsEff + k)), [aujourdhui, nbJoursChamps, departChampsEff]);
   const cleChamps = `${joursChamps.join(',')}|${dep}`;
   const [donneesChamps, setDonneesChamps] = useState<{ cle: string; jours: Record<string, PointChampJour[] | null> } | null>(null);
@@ -2048,9 +2053,10 @@ export default function VideoWeekEnd({
       geo: geoChamps,
       source: 'Prévisions du modèle CEP',
       zone: nomDepartement.toUpperCase(),
+      duree: dureeContenuChamps,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genre, geoChamps, donneesChamps, cleChamps, themeChamps, format.l, format.h, titreChamps[0], titreChamps[1]]);
+  }, [genre, geoChamps, donneesChamps, cleChamps, themeChamps, format.l, format.h, titreChamps[0], titreChamps[1], dureeContenuChamps]);
 
   const avecHook = format.id === 'hook';
   const positions = useMemo(() => {
@@ -2625,6 +2631,19 @@ export default function VideoWeekEnd({
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legende}>
+                Durée de la vidéo : {dureeChampsEff} s{abonne ? ' (« Abonnez-vous ! » compris)' : ''}
+              </span>
+              <input type="range" min={dureeMiniTotale} max={60} step={1} value={dureeChampsEff} onChange={(e) => setDureeChamps(Number(e.target.value))} className="w-full" aria-label="Durée de la vidéo en secondes" />
+              <span className="flex justify-between text-xs text-muted">
+                <span>{dureeMiniTotale} s</span>
+                <button type="button" onClick={() => setDureeChamps(Math.round(dureeParDefautChamps(nbJoursChamps) + (abonne ? DUREE_ABONNE : 0)))} className="underline">
+                  durée courte
+                </button>
+                <span>60 s</span>
+              </span>
             </label>
             <p className="text-xs text-muted">
               Une carte en couleurs par jour (lignes de même valeur et fourchettes écrites dessus), avec les chiffres clés (le plus chaud, le plus frais…), puis la planche complète. Modèle CEP.
