@@ -473,16 +473,22 @@ interface Contexte {
 function dureeContenu(c: Contexte): number {
   if (c.genre === 'alerte' && c.alerte) return DUREE_ALERTE_DEBUT + (c.alerte.carte ? DUREE_ALERTE_CARTE : 0) + c.alerte.types.length * DUREE_ALERTE_TYPE + DUREE_ALERTE_FIN;
   if (c.genre === 'tendance' && c.tendance12) return dureeCartesTendance(c.tendance12.jours.length) + (c.tendance12.semaines ? DUREE_SEMAINES : 0);
-  return dureeTotale(c.villes.length, !!c.hook, !!c.tendance, !!c.carte);
+  return dureeTotale(c.villes.length, !!c.hook, !!c.tendance, !!c.carte, c.semaine.jours.length);
 }
 /** Durée totale : le contenu, puis l'écran « Abonnez-vous ! » si l'option est cochée (dans l'alerte, il est déjà dans la dernière scène). */
 const dureeVideo = (c: Contexte): number => dureeContenu(c) + (c.abonne && c.genre !== 'alerte' ? DUREE_ABONNE : 0);
 
 /** Écran « carte » après l'intro : les villes apparaissent une à une sur la carte, puis la carte reste affichée. */
 const dureeCarte = (n: number) => 1 + 0.55 * n + 3.2;
+/**
+ * Week-end : deux écrans carte, un par jour (samedi puis dimanche). Le premier zoome sur le département ; le second garde le même cadrage
+ * et fait arriver les villes plus vite, pour que la vidéo ne s'allonge que de quelques secondes.
+ */
+const dureeEcranCarte = (n: number, rang: number) => (rang === 0 ? dureeCarte(n) : 0.5 + 0.3 * n + 2.4);
+const dureeCartes = (n: number, nbJours: number) => Array.from({ length: Math.max(1, nbJours) }, (_, k) => dureeEcranCarte(n, k)).reduce((a, b) => a + b, 0);
 
-function dureeTotale(n: number, avecHook = false, avecTendance = false, avecCarte = false) {
-  return (avecHook ? DUREE_HOOK : 0) + DUREE_INTRO + (avecCarte ? dureeCarte(n) : 0) + n * DUREE_VILLE + DUREE_BILAN + (avecTendance ? DUREE_TENDANCE : 0);
+function dureeTotale(n: number, avecHook = false, avecTendance = false, avecCarte = false, nbJours = 1) {
+  return (avecHook ? DUREE_HOOK : 0) + DUREE_INTRO + (avecCarte ? dureeCartes(n, nbJours) : 0) + n * DUREE_VILLE + DUREE_BILAN + (avecTendance ? DUREE_TENDANCE : 0);
 }
 
 /** Tendance des jours qui suivent la vidéo : une ville (la première), un jour par carte (picto, maxi, mini). */
@@ -722,22 +728,27 @@ function fondCarte(ctx: CanvasRenderingContext2D, t: number, duree: number, code
 
 /**
  * Carte du département (ou de la France) : le fond cartographique de l'ouverture de la vidéo, avec chaque ville de la vidéo à sa place
- * (nom, picto, maxi et mini ; un rang par jour pour le week-end), sous le titre « Quel temps … ? ». Image fixe, mêmes formats que la vidéo.
+ * (nom, picto, maxi et mini), sous le titre « Quel temps … ? ». Le week-end a deux cartes, une pour le samedi et une pour le dimanche (`jour`).
  */
-function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte, local?: number, t = 0) {
+function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte, local?: number, t = 0, jour?: number) {
   const { semaine, villes, logo, departement, textes } = c;
   const { width: W, height: H } = ctx.canvas;
   const u = unite(W, H);
+  // `jour` : rang du jour (0 = samedi, 1 = dimanche) quand le week-end a une carte par jour ; sinon la carte montre tous les jours de la semaine.
+  const unSeulJour = jour !== undefined;
+  const suite = unSeulJour && jour > 0;
   // Dans la vidéo, le zoom de l'intro se resserre sur le département, puis les villes arrivent une à une ; en image fixe, tout est affiché.
-  const proj = fondCarte(ctx, 99, 1, c.codeDep ?? '', local === undefined ? 1 : sortie(local / 1));
-  const apparition = (i: number) => (local === undefined ? 1 : sortie((local - 1 - i * 0.55) / 0.4));
+  // Deuxième carte du week-end : le cadrage est déjà celui de la première, les villes arrivent plus vite.
+  const proj = fondCarte(ctx, 99, 1, c.codeDep ?? '', local === undefined || suite ? 1 : sortie(local / 1));
+  const apparition = (i: number) => (local === undefined ? 1 : suite ? sortie((local - 0.5 - i * 0.3) / 0.4) : sortie((local - 1 - i * 0.55) / 0.4));
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'center';
   texteAjuste(ctx, departement.toUpperCase(), W / 2, 92 * u, 60 * u, POLICE, W * 0.9, '#ffe27a');
   texteAjuste(ctx, `${textes.intro[0]} ${textes.periode ?? textes.intro[1]}`, W / 2, 190 * u, 100 * u, POLICE, W * 0.94);
-  texteAjuste(ctx, textes.sous, W / 2, 250 * u, 42 * u, TEXTE, W * 0.92, '#dcecff');
+  if (unSeulJour) texteAjuste(ctx, libelleJour(semaine.jours[jour]), W / 2, 252 * u, 58 * u, POLICE, W * 0.92, '#ffe27a');
+  else texteAjuste(ctx, textes.sous, W / 2, 250 * u, 42 * u, TEXTE, W * 0.92, '#dcecff');
 
-  const n = semaine.jours.length;
+  const n = unSeulJour ? 1 : semaine.jours.length;
   const lh = (n === 1 ? 124 : 70) * u;
   const entete = (n === 1 ? 58 : 48) * u;
   const bw = (n === 1 ? 330 : 370) * u;
@@ -809,7 +820,8 @@ function dessinerCarte(ctx: CanvasRenderingContext2D, c: Contexte, local?: numbe
     ctx.textAlign = 'center';
     texteAjuste(ctx, nomAffiche(b.nom).toUpperCase(), b.x + bw / 2, b.y + (n === 1 ? 42 : 36) * u, (n === 1 ? 34 : 30) * u, POLICE, bw - 28 * u, '#ffe27a');
     const jours = semaine.villes[b.nom] ?? [];
-    jours.slice(0, n).forEach((j, k) => {
+    const duJour = unSeulJour ? jours.slice(jour, jour + 1) : jours.slice(0, n);
+    duJour.forEach((j, k) => {
       const y0 = b.y + entete - 4 * u + k * lh;
       const ps = lh - 10 * u;
       ctx.textAlign = 'left';
@@ -1574,11 +1586,19 @@ function dessinerPrevisions(ctx: CanvasRenderingContext2D, t: number, c: Context
     pied(ctx, logo);
     return;
   }
-  if (c.carte && t < DUREE_INTRO + dureeCarte(villes.length)) {
-    dessinerCarte(ctx, c, t - DUREE_INTRO, t);
-    return;
+  if (c.carte) {
+    // Un écran carte par jour : le week-end montre d'abord le samedi, puis le dimanche.
+    let debutEcran = DUREE_INTRO;
+    for (let k = 0; k < semaine.jours.length; k++) {
+      const duree = dureeEcranCarte(villes.length, k);
+      if (t < debutEcran + duree) {
+        dessinerCarte(ctx, c, t - debutEcran, t, deuxJours ? k : undefined);
+        return;
+      }
+      debutEcran += duree;
+    }
   }
-  const apresIntro = t - DUREE_INTRO - (c.carte ? dureeCarte(villes.length) : 0);
+  const apresIntro = t - DUREE_INTRO - (c.carte ? dureeCartes(villes.length, semaine.jours.length) : 0);
   const indice = Math.floor(apresIntro / DUREE_VILLE);
   if (indice < villes.length) {
     const local = apresIntro - indice * DUREE_VILLE;
@@ -2524,7 +2544,7 @@ export default function VideoWeekEnd({
         {genre === 'previsions' && (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={avecCarte} onChange={(e) => setAvecCarte(e.target.checked)} />
-            🗺️ Écran carte dans la vidéo (toutes les villes sur la carte)
+            🗺️ Écran carte dans la vidéo (toutes les villes sur la carte ; week-end : une carte le samedi, une le dimanche)
           </label>
         )}
         <label className="flex items-start gap-2 text-sm">
