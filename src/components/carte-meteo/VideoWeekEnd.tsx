@@ -12,6 +12,10 @@ import { ICONES_ALERTES } from '@/lib/carte-meteo/icones-alertes';
 import { JEUX_ACCROCHE, dessinerAmbianceAccroche, dessinerIconesAccroche, jeuAccroche } from '@/lib/carte-meteo/icones-accroche';
 import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import { SEUIL_COTE_KM, chargerCote, distanceCoteKm, secteurDe } from '@/lib/carte-meteo/secteurs';
+import { chargerJoursChamps } from '@/lib/carte-meteo/donnees-champs';
+import { THEMES_CHAMPS, jourLong as jourLongChamps, titreAuto as titreAutoChamps, type PointChampJour, type ThemeChamp } from '@/lib/carte-meteo/planche-champs';
+import { preparerVideoChamps, type VideoChamps } from '@/lib/carte-meteo/video-champs';
+import { REPERES_66, useGeoChamps, type VilleRepere } from './useGeoChamps';
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, canEncodeAudio, canEncodeVideo } from 'mediabunny';
 
 /** Tracé de la côte, tel que le rend `chargerCote`. */
@@ -205,11 +209,12 @@ type Mode = 'weekend' | 'jour';
 const JOUR_MAX = 7;
 
 /** Genre de vidéo : prévisions d'un jour ou du week-end (par défaut), alerte (bandeaux rouges, pictos de vigilance) ou tendance (12 jours en cartes, puis 4 semaines). */
-type Genre = 'previsions' | 'alerte' | 'tendance';
+type Genre = 'previsions' | 'alerte' | 'tendance' | 'cartes';
 const GENRES: { id: Genre; libelle: string }[] = [
   { id: 'previsions', libelle: '🌦️ Prévisions' },
   { id: 'alerte', libelle: '⚠️ Alertes' },
   { id: 'tendance', libelle: '📈 Tendance' },
+  { id: 'cartes', libelle: '🎨 Cartes en couleurs' },
 ];
 /** Types d'alerte (vigilance Météo-France) : l'identifiant sert au picto « vigilance-<id>-<niveau> ». */
 const TYPES_ALERTE: { id: string; libelle: string }[] = [
@@ -472,11 +477,14 @@ interface Contexte {
   voixDebut?: number;
   alerte?: DonneesAlerte;
   tendance12?: DonneesTendance;
+  /** Vidéo « cartes en couleurs » : montage prêt à dessiner (une carte par jour, puis la planche complète). */
+  champs?: VideoChamps;
 }
 
 /** Durée du contenu de la vidéo, sans l'écran final « Abonnez-vous ! » (celui des vidéos d'alerte en fait partie). */
 function dureeContenu(c: Contexte): number {
   if (c.genre === 'alerte' && c.alerte) return DUREE_ALERTE_DEBUT + (c.alerte.carte ? DUREE_ALERTE_CARTE : 0) + c.alerte.types.length * DUREE_ALERTE_TYPE + DUREE_ALERTE_FIN;
+  if (c.genre === 'cartes' && c.champs) return c.champs.duree;
   if (c.genre === 'tendance' && c.tendance12) return dureeCartesTendance(c.tendance12.jours.length) + (c.tendance12.semaines ? DUREE_SEMAINES : 0);
   return dureeTotale(c.villes.length, !!c.hook, !!c.tendance, !!c.carte, c.semaine.jours.length);
 }
@@ -1459,6 +1467,7 @@ function dessiner(ctx: CanvasRenderingContext2D, t: number, c: Contexte) {
   const contenu = dureeContenu(c);
   if (c.abonne && c.genre !== 'alerte' && t >= contenu) ecranFinal(ctx, t - contenu, t, c.logo, { haut: 'SUIVEZ LA MÉTÉO EN DIRECT', abonne: true, sombre: false });
   else if (c.genre === 'alerte' && c.alerte) dessinerAlerte(ctx, t, c, c.alerte);
+  else if (c.genre === 'cartes' && c.champs) c.champs.dessiner(ctx, t);
   else if (c.genre === 'tendance' && c.tendance12) dessinerTendance12(ctx, t, c, c.tendance12);
   else dessinerPrevisions(ctx, t, c);
   if (c.legendes && c.legendes.length > 0) dessinerLegendes(ctx, t, dureeVideo(c), c.legendes);
@@ -1712,7 +1721,7 @@ export default function VideoWeekEnd({
   /** Tendance à 4 semaines (CFSv2) des Pyrénées-Orientales, lue côté serveur. */
   saisonnier?: { semaines: Semaine4[] } | null;
 }) {
-  const [genre, setGenre] = useState<Genre>(typeInitial === 'alerte' || typeInitial === 'tendance' ? typeInitial : 'previsions');
+  const [genre, setGenre] = useState<Genre>(typeInitial === 'alerte' || typeInitial === 'tendance' || typeInitial === 'cartes' ? typeInitial : 'previsions');
   // Écran final « Abonnez-vous ! » : option pour toutes les vidéos, cochée d'office dans l'alerte.
   const [abonne, setAbonne] = useState(abonneInitial ? abonneInitial === '1' : true);
   // Textes libres qui apparaissent en gros dans la vidéo : un par ligne, un mot entre *étoiles* est mis en rose.
@@ -1760,7 +1769,8 @@ export default function VideoWeekEnd({
   const [prets, setPrets] = useState(0);
 
   // L'accroche « Quel temps chez nous ? » n'existe que pour les prévisions : alerte et tendance prennent alors le format TikTok simple.
-  const format = FORMATS.find((f) => f.id === (genre !== 'previsions' && formatId === 'hook' ? 'tiktok' : formatId))!;
+  const formatPermis = (id: FormatId) => (genre === 'previsions' ? true : genre === 'cartes' ? id === 'tiktok' || id === 'facebook' : id !== 'hook');
+  const format = FORMATS.find((f) => f.id === (formatPermis(formatId) ? formatId : 'tiktok'))!;
   const jours = useMemo<string[]>(() => (mode === 'weekend' ? weekEnd(aujourdhui) : [ajouterJours(aujourdhui, ecart)]), [aujourdhui, mode, ecart]);
   // Villes de relief : chaque modèle publie sa propre liste de communes de montagne ; on prend celle du modèle qui couvre le dernier jour de la vidéo (AROME, puis ARPEGE, puis CEP).
   const modeleRelief: 'arome' | 'arpege' | 'cep' = jours[jours.length - 1] <= ajouterJours(aujourdhui, ECHEANCE_MAX.arome) ? 'arome' : jours[jours.length - 1] <= ajouterJours(aujourdhui, ECHEANCE_MAX.arpege) ? 'arpege' : 'cep';
@@ -2000,6 +2010,48 @@ export default function VideoWeekEnd({
   const tendance12: DonneesTendance | null =
     cartesTendance && donneesCartes ? { jours: joursCartes, valeurs: donneesCartes.valeurs, cartes: cartesTendance, semaines: dep === '66' ? saisonnier?.semaines ?? null : null } : null;
 
+  // ── Vidéo « cartes en couleurs » : une carte par jour (maxi, mini, pluie ou rafales), modèle CEP ─────────────────────────────
+  const [themeChamps, setThemeChamps] = useState<ThemeChamp>('tx');
+  const [nbJoursChamps, setNbJoursChamps] = useState<2 | 4>(4);
+  const [departChamps, setDepartChamps] = useState(1);
+  const departChampsEff = Math.min(departChamps, 9 - nbJoursChamps);
+  const joursChamps = useMemo(() => Array.from({ length: nbJoursChamps }, (_, k) => ajouterJours(aujourdhui, departChampsEff + k)), [aujourdhui, nbJoursChamps, departChampsEff]);
+  const cleChamps = `${joursChamps.join(',')}|${dep}`;
+  const [donneesChamps, setDonneesChamps] = useState<{ cle: string; jours: Record<string, PointChampJour[] | null> } | null>(null);
+  useEffect(() => {
+    if (genre !== 'cartes' || donneesChamps?.cle === cleChamps) return;
+    const controleur = new AbortController();
+    setErreur(null);
+    chargerJoursChamps('cep', joursChamps, france ? null : dep, controleur.signal)
+      .then((r) => setDonneesChamps({ cle: cleChamps, jours: r }))
+      .catch((e: Error) => e.name !== 'AbortError' && setErreur(e.message));
+    return () => controleur.abort();
+  }, [genre, cleChamps, donneesChamps?.cle, joursChamps, dep, france]);
+  // Villes repères : celles choisies à la main pour le 66, sinon cinq villes bien réparties du département.
+  const reperes = useMemo<VilleRepere[] | undefined>(() => {
+    if (genre !== 'cartes' || france) return undefined;
+    if (dep === '66') return REPERES_66;
+    if (listeVilles?.dep !== dep) return undefined;
+    const noms = new Set(villesAuto(listeVilles.villes, alea(`reperes|${dep}`), 5));
+    return listeVilles.villes.filter((v) => noms.has(v.nom)).map((v) => ({ nom: v.nom, lat: v.lat, lon: v.lon }));
+  }, [genre, france, dep, listeVilles]);
+  const geoChamps = useGeoChamps(france ? undefined : dep, reperes, genre === 'cartes');
+  const titreChamps = titreAutoChamps(themeChamps, joursChamps, france ? undefined : nomDepartement.toUpperCase());
+  const champs = useMemo<VideoChamps | null>(() => {
+    if (genre !== 'cartes' || !geoChamps || donneesChamps?.cle !== cleChamps) return null;
+    return preparerVideoChamps({
+      largeur: format.l,
+      hauteur: format.h,
+      theme: themeChamps,
+      jours: joursChamps.map((iso) => ({ iso, points: donneesChamps.jours[iso] ?? null })),
+      titre: titreChamps,
+      geo: geoChamps,
+      source: 'Prévisions du modèle CEP',
+      zone: nomDepartement.toUpperCase(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genre, geoChamps, donneesChamps, cleChamps, themeChamps, format.l, format.h, titreChamps[0], titreChamps[1]]);
+
   const avecHook = format.id === 'hook';
   const positions = useMemo(() => {
     const parNom = new Map((listeVilles?.dep === dep ? [...listeVilles.villes, ...listeVilles.reliefs] : []).map((v) => [v.nom, { lat: v.lat, lon: v.lon }]));
@@ -2069,6 +2121,10 @@ export default function VideoWeekEnd({
   const contexte: Contexte | null =
     genre === 'alerte'
       ? { ...base, genre, alerte: { entete: saisies.entete ?? autoAlerte.entete, titre: saisies.titre ?? autoAlerte.titre, periode: saisies.periode ?? autoAlerte.periode, detail: saisies.detail ?? '', types: pictosAlerte, carte: carteAlerte } }
+      : genre === 'cartes'
+        ? champs
+          ? { ...base, genre, champs }
+          : null
       : genre === 'tendance'
         ? tendance12
           ? { ...base, genre, tendance12 }
@@ -2144,8 +2200,10 @@ export default function VideoWeekEnd({
       const nomFichier = (ext: string) =>
         genre === 'alerte'
           ? `alerte-${niveauAlerte}-${dep}-${format.id}-${dateAlerte}.${ext}`
-          : genre === 'tendance'
-            ? `tendance-${dep}-${format.id}-${aujourdhui}.${ext}`
+          : genre === 'cartes'
+            ? `cartes-${themeChamps}-${dep}-${joursChamps[0]}-${nbJoursChamps}-jours-${format.id}.${ext}`
+            : genre === 'tendance'
+              ? `tendance-${dep}-${format.id}-${aujourdhui}.${ext}`
             : `meteo-${special === 'auto' ? '' : `${special}-`}${mode === 'weekend' ? 'weekend' : 'jour'}-${dep}-${format.id}-${jours[0]}.${ext}`;
       const telecharger = (blob: Blob, ext: string) => {
         const url = URL.createObjectURL(blob);
@@ -2330,7 +2388,7 @@ export default function VideoWeekEnd({
     setErreur(null);
     // L'alerte se termine par « Abonnez-vous ! » ; alerte et tendance se font pour un département, pas pour la France entière.
     if (g === 'alerte') setAbonne(true);
-    if (g !== 'previsions' && dep === FRANCE) {
+    if (g !== 'previsions' && g !== 'cartes' && dep === FRANCE) {
       setDonnees(null);
       setChoix([]);
       setDep('66');
@@ -2391,7 +2449,7 @@ export default function VideoWeekEnd({
         <label className="text-sm font-medium">
           <span className={legende}>Zone</span>
           <select value={dep} onChange={(e) => { setDonnees(null); setChoix([]); setDep(e.target.value); }} className={selectBarre}>
-            {genre === 'previsions' && <option value={FRANCE}>🇫🇷 France (grandes villes)</option>}
+            {(genre === 'previsions' || genre === 'cartes') && <option value={FRANCE}>🇫🇷 {genre === 'cartes' ? 'France entière' : 'France (grandes villes)'}</option>}
             {CODES_DEPARTEMENTS.map((c) => (
               <option key={c} value={c}>
                 {c} — {DEPARTEMENTS_FR[c]}
@@ -2536,10 +2594,48 @@ export default function VideoWeekEnd({
             {dep === '66' ? ' la tendance à 4 semaines (écart à la normale de la température et de la pluie, modèle saisonnier CFSv2).' : ' (la tendance à 4 semaines n’existe que pour les Pyrénées-Orientales).'}
           </p>
         )}
+        {genre === 'cartes' && (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+            <div>
+              <span className={legende}>Thème des cartes</span>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(THEMES_CHAMPS) as ThemeChamp[]).map((id) => (
+                  <button key={id} type="button" onClick={() => setThemeChamps(id)} aria-pressed={themeChamps === id} className={`rounded-lg border px-3 py-1.5 text-sm ${themeChamps === id ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>
+                    {THEMES_CHAMPS[id].libelle}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <span className={legende}>Nombre de cartes</span>
+              <div className="flex gap-2">
+                {([2, 4] as const).map((d) => (
+                  <button key={d} type="button" onClick={() => setNbJoursChamps(d)} aria-pressed={nbJoursChamps === d} className={`rounded-lg border px-3 py-1.5 text-sm ${nbJoursChamps === d ? 'border-primary bg-primary text-white' : 'border-border bg-surface'}`}>
+                    {d} jours
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="text-sm font-medium">
+              <span className={legende}>Premier jour</span>
+              <select value={departChampsEff} onChange={(e) => setDepartChamps(Number(e.target.value))} className={selectBarre}>
+                {Array.from({ length: 9 - nbJoursChamps }, (_, k) => k + 1).map((k) => (
+                  <option key={k} value={k}>
+                    {k === 1 ? 'Demain' : `J+${k}`} ({jourLongChamps(ajouterJours(aujourdhui, k)).toLowerCase()})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="text-xs text-muted">
+              Une carte en couleurs par jour (lignes de même valeur et fourchettes écrites dessus), avec les chiffres clés (le plus chaud, le plus frais…), puis la planche complète. Modèle CEP.
+              {france ? ' Valeurs des 96 départements.' : ' Valeurs des villes et des communes de montagne du département.'}
+            </p>
+          </div>
+        )}
         <label className="text-sm font-medium">
           <span className={legende}>Format de la vidéo</span>
           <select value={format.id} onChange={(e) => setFormatId(e.target.value as FormatId)} className={selectBarre}>
-            {FORMATS.filter((f) => genre === 'previsions' || f.id !== 'hook').map((f) => (
+            {FORMATS.filter((f) => formatPermis(f.id)).map((f) => (
               <option key={f.id} value={f.id}>
                 {f.libelle}
               </option>
@@ -2642,8 +2738,10 @@ export default function VideoWeekEnd({
           Format {format.l} × {format.h}, {Math.round(total)} secondes :{' '}
           {genre === 'alerte'
             ? 'bandeaux, pictos de vigilance, un écran par type d’alerte, suivez la situation en direct'
-            : genre === 'tendance'
-              ? `une carte de température par jour${tendance12?.semaines ? ', tendance à 4 semaines' : ''}`
+            : genre === 'cartes'
+              ? 'ouverture, une grande carte en couleurs par jour avec ses chiffres clés, puis la planche complète'
+              : genre === 'tendance'
+                ? `une carte de température par jour${tendance12?.semaines ? ', tendance à 4 semaines' : ''}`
               : `titre, une image par ville, récapitulatif${tendance ? ', tendance des prochains jours' : ''}`}
           {abonne ? ', « Abonnez-vous ! »' : ''}. Le MP4 s&apos;enregistre dans le navigateur (Chrome, Edge) ; ailleurs, un WebM.
         </p>
@@ -2701,7 +2799,7 @@ export default function VideoWeekEnd({
             </span>
           )}
         </label>
-        {!contexte && !erreur && <p className="text-sm text-muted">{genre === 'tendance' ? 'Chargement des prévisions des 12 jours…' : 'Chargement des villes et des prévisions…'}</p>}
+        {!contexte && !erreur && <p className="text-sm text-muted">{genre === 'tendance' ? 'Chargement des prévisions des 12 jours…' : genre === 'cartes' ? 'Chargement des prévisions et des cartes…' : 'Chargement des villes et des prévisions…'}</p>}
       </div>
     </div>
   );

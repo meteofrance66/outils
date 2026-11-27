@@ -20,7 +20,6 @@ import {
   type ParamsPlancheChamps,
 } from './planche-champs';
 
-export const FPS_CHAMPS = 30;
 const DUREE_INTRO = 2.4;
 const DUREE_JOUR = 3.4;
 const DUREE_FIN = 3.4;
@@ -235,33 +234,5 @@ export function preparerVideoChamps(p: Params): VideoChamps {
     ctx.restore();
   };
   return { duree, dessiner };
-}
-
-/** Encode la vidéo en MP4 (H.264, 30 i/s) dans le navigateur ; `progres` reçoit 0 → 1. */
-export async function encoderVideoChamps(video: VideoChamps, largeur: number, hauteur: number, progres: (f: number) => void): Promise<Blob> {
-  const { BufferTarget, CanvasSource, Mp4OutputFormat, Output, canEncodeVideo } = await import('mediabunny');
-  if (!(await canEncodeVideo('avc', { width: largeur, height: hauteur, bitrate: 8_000_000 }).catch(() => false))) {
-    throw new Error('Ce navigateur ne sait pas encoder la vidéo MP4 : utilise Chrome ou Edge à jour.');
-  }
-  const c = document.createElement('canvas');
-  c.width = largeur;
-  c.height = hauteur;
-  const ctx = c.getContext('2d')!;
-  const sortieMp4 = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target: new BufferTarget() });
-  const source = new CanvasSource(c, { codec: 'avc', bitrate: 8_000_000, keyFrameInterval: 1 });
-  sortieMp4.addVideoTrack(source, { frameRate: FPS_CHAMPS });
-  await sortieMp4.start();
-  const nb = Math.round(video.duree * FPS_CHAMPS);
-  for (let i = 0; i < nb; i++) {
-    video.dessiner(ctx, i / FPS_CHAMPS);
-    await source.add(i / FPS_CHAMPS, 1 / FPS_CHAMPS);
-    if (i % 5 === 0) {
-      progres(i / nb);
-      await new Promise((r) => setTimeout(r, 0));
-    }
-  }
-  source.close();
-  await sortieMp4.finalize();
-  return new Blob([sortieMp4.target.buffer!], { type: 'video/mp4' });
 }
 

@@ -38,6 +38,8 @@ export const GROUPES_DE_PAGES: GroupeDePages[] = [
       { href: '/outils/carte-meteo/video/?zone=66&abonne=1', libelle: '🔔 Vidéo TikTok + Abonnez-vous : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/video/?zone=66&type=alerte', libelle: '⚠️ Vidéo TikTok alertes orange : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/video/?zone=66&type=tendance', libelle: '📈 Vidéo TikTok tendance : Pyrénées-Orientales' },
+      { href: '/outils/carte-meteo/video/?zone=66&type=cartes', libelle: '🎨 Vidéo TikTok cartes en couleurs : Pyrénées-Orientales' },
+      { href: '/outils/pyrenees-orientales/#planche-champs', libelle: '🎨 Cartes en couleurs (image) : Pyrénées-Orientales' },
       { href: '/outils/carte-meteo/carte-alerte/', libelle: '🚨 Alertes réseaux' },
     ],
   },
