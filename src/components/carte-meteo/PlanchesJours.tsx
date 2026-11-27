@@ -96,13 +96,17 @@ interface Props {
   modelesChoix?: ModeleSource[];
   /** Format choisi à l'ouverture de la page (paysage par défaut). */
   formatInitial?: FormatPlanche;
+  /** Durées proposées (nombre de jours) ; toutes celles des planches tendances par défaut. */
+  durees?: readonly number[];
+  /** Moment de la journée choisi à l'ouverture de la page (« journée » par défaut). */
+  periodeInitiale?: PeriodePlanche;
 }
 
 /**
  * Planches « jours » : un seul JPG avec une carte par jour (2 cartes pour 2 jours, 4 pour 4… 16 pour 16 jours), pour la France, une
  * région ou un département, avec un seul picto par point (le temps de la journée) et ses températures.
  */
-export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false, departInitial = 1, logoInitial = 'alertesmeteo', styleInitial, modelesChoix, formatInitial = 'paysage' }: Props) {
+export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, zoneInitiale = 'france', fondCarteMeteo = false, departInitial = 1, logoInitial = 'alertesmeteo', styleInitial, modelesChoix, formatInitial = 'paysage', durees = DUREES_TENDANCES, periodeInitiale = 'journee' }: Props) {
   const [jeuAlertes, setJeuAlertes] = useJeuAlertes();
   const [modeleId, setModeleId] = useState<string>(modele.id);
   const [formatChoisi, setFormatChoisi] = useState<FormatPlanche>(formatInitial);
@@ -128,7 +132,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const hauteurJour = tx.hJour;
   /** Modèle des prévisions (celui choisi, sinon celui de la page). */
   const modeleActif = MODELES.find((m) => m.id === modeleId) ?? modele;
-  const [dureeChoisie, setDuree] = useState<number>(4);
+  const [dureeChoisie, setDuree] = useState<number>(durees.includes(4) ? 4 : durees[0]);
   const [nombreVillesTableau, setNombreVillesTableau] = useState(10); // 0 : toutes les villes.
   /** Premier jour des cartes : 0 = aujourd'hui, 1 = demain (planche sans la carte du jour). */
   const [departChoisi, setDepart] = useState(departInitial);
@@ -162,7 +166,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
   const [tailleIcones, setTailleIcones] = useState(100);
   /** Rafale (km/h) à partir de laquelle la pastille de vent s'ajoute au picto. */
   const [seuilRafale, setSeuilRafale] = useState(80);
-  const [periode, setPeriode] = useState<PeriodePlanche>('journee');
+  const [periode, setPeriode] = useState<PeriodePlanche>(periodeInitiale);
   /** Titre « TENDANCE SUR 4 JOURS : … » dans l'en-tête : affiché d'office. */
   const [avecTitre, setAvecTitre] = useState(true);
   /** Zone dans le titre (« … : Pyrénées-Orientales »), ligne des dates et mention « Mer Méditerranée » : null = selon le format, voir `epure`. */
@@ -586,7 +590,9 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
     <section id="planches-jours" className="scroll-mt-4">
       <h2 className="text-2xl font-extrabold">Une planche JPG : une carte par jour</h2>
       <p className="mt-1 max-w-3xl text-sm text-muted">
-        Un seul JPG avec les cartes de chaque jour : 2 cartes pour 2 jours, 4 pour 4 jours… jusqu&apos;à 16 cartes pour 16 jours, pour la France, une région ou un département.
+        {durees === DUREES_TENDANCES
+          ? "Un seul JPG avec les cartes de chaque jour : 2 cartes pour 2 jours, 4 pour 4 jours… jusqu'à 16 cartes pour 16 jours, pour la France, une région ou un département."
+          : `Un seul JPG avec une carte par jour : ${durees.map((d) => `${d} cartes pour ${d} jours`).join(', ')}, pour la France, une région ou un département.`}
         Un seul picto par point (le temps de la journée), avec la maximale et la minimale.
       </p>
       {modelesChoix && modelesChoix.length > 1 && (
@@ -648,7 +654,7 @@ export default function PlanchesJours({ aujourdhui, modele, jours: joursBruts, z
         ))}
       </div>
       <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Durée">
-        {DUREES_TENDANCES.map((d) => (
+        {durees.map((d) => (
           <button
             key={d}
             type="button"
