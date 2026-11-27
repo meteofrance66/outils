@@ -31,6 +31,7 @@ import {
 import TexteSurCarte from './TexteSurCarte';
 import { statsDe, type CarteTexte, type RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import { CODES_DEPARTEMENTS, ECHEANCE_MAX, MODELES, ajouterJours, modeleDisponible, modeleParDefautJ0, type ModeleMeteo, type PointCarte } from '@/lib/carte-meteo/previsions-modeles';
+import { DUREES_TENDANCE_CARTE, agregerTendance, dureeMaxPermise, estDureeTendance, joursDeLaTendance, libellePeriode, pictoDominant, type DureeTendanceCarte } from '@/lib/carte-meteo/tendance-jours';
 import CarteRendu, {
   ECHELLE_VENT_REDUIT,
   LARGEUR_VENT,
@@ -64,6 +65,8 @@ export interface DonneesCarte {
   modele: ModeleMeteo;
   dateISO: string;
   points: PointCarte[];
+  /** Tendance : nombre de jours que couvrent les points (à partir de `dateISO`) ; absent = un seul jour. */
+  duree?: number;
 }
 
 export interface DonneesVilles extends DonneesCarte {
@@ -365,6 +368,16 @@ const texte = (v: number | null) => (v == null ? '' : String(Math.round(v)));
 const pluiePicto = (mm: number | null | undefined) => (mm == null ? null : mm > 1 ? mm : 0);
 
 function pictosDuPoint(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pictoAM: PictoMeteo; pictoJ: PictoMeteo; pictoS: PictoMeteo; pictoN: PictoMeteo } {
+  const pictos = pictosDuJour(p, jeu);
+  // Tendance sur 2 ou 4 jours : le picto de l'après-midi et celui de la journée sont celui qui domine sur toute la période.
+  if (p.tendanceJours && p.tendanceJours.length > 1) {
+    const dominant = pictoDominant(p.tendanceJours, (j) => averseNuageGris(pictoDepuisPrevision({ code: j.codeJournee, nuages: j.nuagesJournee, pluie: pluiePicto(j.pluieJournee), temperature: j.maxi, voile: j.voileJournee }, jeu), jeu));
+    return { ...pictos, pictoAM: dominant, pictoJ: dominant };
+  }
+  return pictos;
+}
+
+function pictosDuJour(p: PointCarte, jeu: JeuPictos): { pictoM: PictoMeteo; pictoAM: PictoMeteo; pictoJ: PictoMeteo; pictoS: PictoMeteo; pictoN: PictoMeteo } {
   return {
     pictoS: averseNuageGris(pictoDepuisPrevision({ code: p.codeSoiree ?? null, nuages: p.nuagesSoiree ?? null, pluie: pluiePicto(p.pluieSoiree ?? null), temperature: p.tempSoiree ?? null, voile: p.voileSoiree, nuit: true }, jeu), jeu),
     pictoN: averseNuageGris(pictoDepuisPrevision({ code: p.codeNuit ?? null, nuages: p.nuagesNuit ?? null, pluie: pluiePicto(p.pluieNuit ?? null), temperature: p.tempNuit ?? null, voile: p.voileNuit, nuit: true }, jeu), jeu),
@@ -494,6 +507,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   /** Après-midi : afficher aussi le mini et le maxi de la journée (picto de l'après-midi), au lieu de la T° de l'après-midi. */
   const [miniMaxi, setMiniMaxi] = useState(reglages?.miniMaxi ?? false);
   const miniMaxiAM = miniMaxi && periode === 'apres-midi';
+  /** Tendance : nombre de jours (1, 2 ou 4) à partir du jour choisi, pour les cartes « mini et maxi » (après-midi avec mini et maxi, ou journée). */
+  const [duree, setDuree] = useState<DureeTendanceCarte>(1);
   const [donnees, setDonnees] = useState<DonneesCarte | null>(initial);
   const [editions, setEditions] = useState<Record<string, Edition>>(() => ({
     ...(initial ? construireEditions(initial.points, jeuInitial) : {}),
@@ -593,7 +608,10 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   const nombreRafales: NombreRafales = choixRafales ?? (enDepartement ? 'toutes' : '4');
   const maxRafales = maximumRafales(nombreRafales);
   const dateISO = ajouterJours(aujourdhui, jour);
-  const aJour = donnees?.modele === modele && donnees.dateISO === dateISO;
+  // La tendance n'existe que pour les cartes de France ou de région qui montrent le mini et le maxi ; ailleurs, un seul jour.
+  const tendancePossible = !enDepartement && (miniMaxiAM || periode === 'journee');
+  const dureeEff: DureeTendanceCarte = tendancePossible ? duree : 1;
+  const aJour = donnees?.modele === modele && donnees.dateISO === dateISO && (donnees.duree ?? 1) === dureeEff;
   const villesAJour = donneesVilles?.modele === modele && donneesVilles.dateISO === dateISO && donneesVilles.departement === departement;
   const depVue = enDepartement ? departement : null;
 
@@ -601,7 +619,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
   // et rétablis à la prochaine ouverture. Pas les prévisions ni les retouches faites sur la carte (voir « Figer la carte »).
   const [memoriser, setMemoriser] = useState(false);
   const [erreurMemo, setErreurMemo] = useState<string | null>(null);
-  const parametres = JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, jeuPictos, tailleIcones, tailleVent, periode, miniMaxi, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, altitudeNeige, reglagesTexte, tailleIcone, texteNouveau, iconeNouvelle, rafaleNouvelle, provenanceNouvelle, mersFigees });
+  const parametres = JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, jeuPictos, tailleIcones, tailleVent, periode, miniMaxi, duree, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, afficherRessenti, logoPresetId, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, altitudeNeige, reglagesTexte, tailleIcone, texteNouveau, iconeNouvelle, rafaleNouvelle, provenanceNouvelle, mersFigees });
   useEffect(() => {
     if (compact) return;
     try {
@@ -619,6 +637,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       if ('tailleVent' in e) setTailleVent(e.tailleVent as never);
       if ('periode' in e) setPeriode(e.periode as never);
       if ('miniMaxi' in e) setMiniMaxi(e.miniMaxi as never);
+      if (estDureeTendance(e.duree)) setDuree(e.duree);
       if ('fond' in e) setFond(e.fond as never);
       if ('niveauNoms' in e) setNiveauNoms(e.niveauNoms as never);
       if ('afficherNoms' in e) setAfficherNoms(e.afficherNoms as never);
@@ -700,6 +719,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       if ('tailleIcones' in e) setTailleIcones(e.tailleIcones as never);
       if ('periode' in e) setPeriode(e.periode as never);
       if ('miniMaxi' in e) setMiniMaxi(e.miniMaxi as never);
+      if (estDureeTendance(e.duree)) setDuree(e.duree);
       if ('donnees' in e) setDonnees(e.donnees as never);
       if ('editions' in e) setEditions(e.editions as never);
       if ('fond' in e) setFond(e.fond as never);
@@ -746,7 +766,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     if (!figee || compact) return;
     const minuteur = setTimeout(() => {
       try {
-        localStorage.setItem(cleCarteFigee(reglages), JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, rafalesRetirees: [...rafalesRetirees], pictosRetires: [...pictosRetires], dateISO, figeeLe }));
+        localStorage.setItem(cleCarteFigee(reglages), JSON.stringify({ modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, duree, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, rafalesRetirees: [...rafalesRetirees], pictosRetires: [...pictosRetires], dateISO, figeeLe }));
         setErreurFiger(null);
       } catch {
         setErreurFiger('Sauvegarde impossible dans ce navigateur (navigation privée ou stockage plein, logo importé trop lourd ?).');
@@ -754,7 +774,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     }, 400);
     return () => clearTimeout(minuteur);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, rafalesRetirees, pictosRetires, dateISO, figee, compact, figeeLe]);
+  }, [modele, modeleTouche, niveau, region, departement, densite, donneesVilles, jeuPictos, tailleIcones, periode, miniMaxi, duree, donnees, editions, fond, niveauNoms, afficherNoms, seuilChoisi, choixRafales, styleVent, tailleVent, afficherRessenti, logoPresetId, logoPersonnalise, titreManuel, sousTitreManuel, moyennesManuelles, rafalesManuelles, ventsDeplaces, pictosDeplaces, ajouts, rafalesAjoutees, annotations, altitudeNeige, altitudes, pied, afficherFleuves, densiteChoisie, opaciteFleuves, afficherFleches, afficherRelief, reliefPourcent, fondChoisi, styleFond, rafalesRetirees, pictosRetires, dateISO, figee, compact, figeeLe]);
   function basculerFiger() {
     if (figee) {
       setFigee(false);
@@ -790,17 +810,27 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     }
   }, [depVue, jour, modele, modeleTouche, reglages?.modele, figee]);
 
+  // Filet de sécurité : une tendance (réglage mémorisé, retour au modèle par défaut…) qui dépasse l'échéance du modèle passe au CEP.
+  useEffect(() => {
+    if (!figee && dureeEff > 1 && jour + dureeEff - 1 > ECHEANCE_MAX[modele]) setModele('cep');
+  }, [figee, dureeEff, jour, modele]);
+
   useEffect(() => {
     if (figee || enDepartement || aJour || erreur) return;
     const controleur = new AbortController();
-    fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${dateISO}`, { signal: controleur.signal })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
-        return r.json() as Promise<{ points: PointCarte[] }>;
-      })
-      .then((json) => {
-        setDonnees({ modele, dateISO, points: json.points });
-        setEditions((prev) => ({ ...prev, ...construireEditions(json.points, jeuRef.current) }));
+    // Tendance : un chargement par jour de la période, regroupés ensuite (un seul jour : la carte habituelle).
+    Promise.all(
+      joursDeLaTendance(dateISO, dureeEff).map((date) =>
+        fetch(`/api/carte-meteo/previsions/?modele=${modele}&date=${date}`, { signal: controleur.signal }).then(async (r) => {
+          if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'Prévisions momentanément indisponibles');
+          return (await r.json()) as { points: PointCarte[] };
+        })
+      )
+    )
+      .then((jours) => {
+        const points = agregerTendance(jours.map((j) => j.points));
+        setDonnees({ modele, dateISO, points, ...(dureeEff > 1 && { duree: dureeEff }) });
+        setEditions((prev) => ({ ...prev, ...construireEditions(points, jeuRef.current) }));
         setMoyennesManuelles({});
         setRafalesManuelles({});
         setRafalesRetirees(new Set());
@@ -820,7 +850,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         else setErreur(e.message.endsWith('.') ? e.message : `${e.message}.`);
       });
     return () => controleur.abort();
-  }, [figee, enDepartement, aJour, erreur, modele, dateISO]);
+  }, [figee, enDepartement, aJour, erreur, modele, dateISO, dureeEff]);
 
   useEffect(() => {
     if (figee || !enDepartement || villesAJour || erreur) return;
@@ -1499,8 +1529,8 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
       ]
     : [];
 
-  const titre = titreManuel ?? libelleJour(dateISO);
-  const sousTitre = sousTitreManuel ?? SOUS_TITRES[periode];
+  const titre = titreManuel ?? (dureeEff > 1 ? libellePeriode(dateISO, ajouterJours(dateISO, dureeEff - 1)) : libelleJour(dateISO));
+  const sousTitre = sousTitreManuel ?? (dureeEff > 1 ? `TENDANCE SUR ${dureeEff} JOURS` : SOUS_TITRES[periode]);
   const nomZone = enFrance ? 'France' : zone.startsWith('reg:') ? zone.slice(4) : DEPARTEMENTS_FR[zone.slice(4)];
 
   /** Données du texte automatique : températures et rafales des villes affichées sur la carte. */
@@ -1519,20 +1549,42 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
     return rubriques.length === 0 ? null : { type: 'Prévisions météo', titre, periode: sousTitre, zone: nomZone, source: '', rubriques };
   };
 
+  /** Modèle quitté pour le CEP quand une tendance dépasse son échéance : rétabli au retour à un seul jour (sauf modèle rechoisi entre-temps). */
+  const modeleAvantTendance = useRef<ModeleMeteo | null>(null);
+
   function changerModele(m: ModeleMeteo) {
+    modeleAvantTendance.current = null;
     setModele(m);
     setModeleTouche(true);
-    setJour((j) => Math.min(j, ECHEANCE_MAX[m]));
+    // Un modèle à courte échéance raccourcit le jour de départ, puis la durée de la tendance (elle doit tenir dans son échéance).
+    const premier = Math.min(jour, ECHEANCE_MAX[m]);
+    setJour(premier);
+    setDuree((d) => dureeMaxPermise(d, premier, ECHEANCE_MAX[m]));
+    setErreur(null);
+    setTitreManuel(null);
+    setSousTitreManuel(null);
+  }
+
+  function changerJour(j: number) {
+    // Au-delà de l'échéance du modèle (AROME, Harmonie : J+1), on passe au CEP, qui va jusqu'à J+15 ; une tendance compte jusqu'à son dernier jour.
+    if (j + dureeEff - 1 > ECHEANCE_MAX[modele]) setModele('cep');
+    setJour(j);
     setErreur(null);
     setTitreManuel(null);
   }
 
-  function changerJour(j: number) {
-    // Au-delà de l'échéance du modèle (AROME, Harmonie : J+1), on passe au CEP, qui va jusqu'à J+15.
-    if (j > ECHEANCE_MAX[modele]) setModele('cep');
-    setJour(j);
+  function changerDuree(d: DureeTendanceCarte) {
+    if (d > 1 && jour + d - 1 > ECHEANCE_MAX[modele]) {
+      modeleAvantTendance.current ??= modele;
+      setModele('cep');
+    } else if (d === 1 && modeleAvantTendance.current) {
+      setModele(modeleAvantTendance.current);
+      modeleAvantTendance.current = null;
+    }
+    setDuree(d);
     setErreur(null);
     setTitreManuel(null);
+    setSousTitreManuel(null);
   }
 
   function modifier(code: string, champ: 'valeur' | 'mini' | 'picto' | 'rafale' | 'altitude', valeur: string, partout = false) {
@@ -1622,7 +1674,7 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
         const secours = setTimeout(r, 250);
         requestAnimationFrame(() => requestAnimationFrame(() => (clearTimeout(secours), r(null))));
       });
-      const nom = `carte-meteo-${normaliser(nomZone).replace(/ /g, '-')}-${dateISO}-${periode}`;
+      const nom = `carte-meteo-${normaliser(nomZone).replace(/ /g, '-')}-${dateISO}-${periode}${dureeEff > 1 ? `-tendance-${dureeEff}-jours` : ''}`;
       await exporterEnJpg(carteRef.current, nom, largeurCarte, HAUTEUR_CARTE);
     } catch (e) {
       console.error('Export de la carte', e);
@@ -2206,14 +2258,26 @@ export default function CarteMeteo({ aujourdhui, initial, initialVilles = null, 
             <label className="text-sm font-medium">
               <span className={legendeBarre}>Jour</span>
               <select value={jour} onChange={(e) => changerJour(Number(e.target.value))} className={selectBarre}>
-                {Array.from({ length: ECHEANCE_MAX.cep + 1 }, (_, n) => (
+                {Array.from({ length: ECHEANCE_MAX.cep + 2 - dureeEff }, (_, n) => (
                   <option key={n} value={n}>
                     {NOM_ECHEANCE(n)}
-                    {n > ECHEANCE_MAX[modele] ? ' (CEP)' : ''}
+                    {n + dureeEff - 1 > ECHEANCE_MAX[modele] ? ' (CEP)' : ''}
                   </option>
                 ))}
               </select>
             </label>
+            {tendancePossible && (
+              <label className="text-sm font-medium">
+                <span className={legendeBarre}>Tendance</span>
+                <select value={duree} onChange={(e) => changerDuree(Number(e.target.value) as DureeTendanceCarte)} className={selectBarre} aria-label="Nombre de jours de la carte, à partir du jour choisi">
+                  {DUREES_TENDANCE_CARTE.map((d) => (
+                    <option key={d} value={d} disabled={jour + d - 1 > ECHEANCE_MAX.cep}>
+                      {d === 1 ? 'Un seul jour' : `${d} jours à partir de ce jour${jour + d - 1 > ECHEANCE_MAX[modele] ? ' (CEP)' : ''}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <fieldset>
               <legend className={legendeBarre}>Période</legend>
               <div className="flex flex-wrap gap-x-3 gap-y-1">

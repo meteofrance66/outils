@@ -191,6 +191,11 @@ export interface PointCarte {
   maxiPeriode?: number | null;
   miniPeriode?: number | null;
   finPeriode?: string | null;
+  /**
+   * Carte « tendance » de la carte météo (2 ou 4 jours à partir d'un jour) : ce que chaque jour a donné pour le ciel, dans l'ordre,
+   * pour choisir le picto qui domine. `maxi` et `mini` du point sont alors ceux de toute la période. Absent d'une carte d'un seul jour.
+   */
+  tendanceJours?: Pick<PointCarte, 'codeJournee' | 'nuagesJournee' | 'pluieJournee' | 'maxi' | 'voileJournee'>[];
   /** Soirée (18 h-22 h : température de 21 h) et nuit (22 h-6 h, du jour au lendemain : température minimale). Absents des anciennes réponses. */
   tempSoiree?: number | null;
   rafaleSoiree?: number | null;

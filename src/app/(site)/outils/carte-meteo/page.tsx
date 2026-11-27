@@ -45,6 +45,9 @@ export default async function PageCarteMeteo() {
       </div>
 
       <h2 className="mt-12 text-2xl font-extrabold">France : demain après-midi, mini et maxi</h2>
+      <p className="mt-2 text-muted">
+        Option « Tendance » : la même carte sur 2 ou 4 jours à partir de demain, avec le mini le plus bas, le maxi le plus haut et le temps qui domine (modèle CEP).
+      </p>
       <div className="mt-6">
         <CarteMeteo aujourdhui={aujourdhui} initial={initialDemain} reglages={{ jour: 1, miniMaxi: true, jeuPictos: 'alertes-pro', tailleIcones: 140 }} />
       </div>
