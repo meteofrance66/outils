@@ -50,6 +50,25 @@ export interface JeuAccroche {
   ambiance?: Ambiance;
 }
 
+/**
+ * La même icône, réduite d'un facteur `k` et descendue de `dy` unités (avant réduction) : un dessin plus haut que ±50 unités, liseré
+ * compris, déborderait sur le texte de l'accroche ou sur la bande du haut. Le liseré garde son épaisseur habituelle.
+ */
+export function reduite(icone: Icone, k: number, dy = 0): Icone {
+  const envelopper = (f: (ctx: Ctx, t: number) => void) => (ctx: Ctx, t: number) => {
+    ctx.save();
+    ctx.scale(k, k);
+    ctx.translate(0, dy);
+    f(ctx, t);
+    ctx.restore();
+  };
+  return {
+    arriere: icone.arriere && envelopper(icone.arriere),
+    corps: envelopper(icone.corps),
+    effets: icone.effets && envelopper(icone.effets),
+  };
+}
+
 // ── Maths et animation ──────────────────────────────────────────────────────────────────────────────────────────────
 export const clamp = (v: number, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 export const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
