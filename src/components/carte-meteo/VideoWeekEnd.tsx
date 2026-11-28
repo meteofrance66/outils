@@ -14,7 +14,7 @@ import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import { SEUIL_COTE_KM, chargerCote, distanceCoteKm, secteurDe } from '@/lib/carte-meteo/secteurs';
 import { chargerJoursChamps } from '@/lib/carte-meteo/donnees-champs';
 import { THEMES_CHAMPS, jourLong as jourLongChamps, titreAuto as titreAutoChamps, type PointChampJour, type ThemeChamp } from '@/lib/carte-meteo/planche-champs';
-import { APPARITIONS_CARTES, dureeMiniChamps, dureeParDefautChamps, preparerVideoChamps, type ApparitionCarte, type VideoChamps } from '@/lib/carte-meteo/video-champs';
+import { APPARITIONS_CARTES, dureeApparitionParDefaut, dureeMiniChamps, dureeParDefautChamps, preparerVideoChamps, type ApparitionCarte, type VideoChamps } from '@/lib/carte-meteo/video-champs';
 import { REPERES_66, useGeoChamps, type VilleRepere } from './useGeoChamps';
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, canEncodeAudio, canEncodeVideo } from 'mediabunny';
 
@@ -2019,8 +2019,15 @@ export default function VideoWeekEnd({
   const [dureeChamps, setDureeChamps] = useState(20);
   // Entrée des cartes : Swipe Up par défaut ; fondu simple si l'appareil demande moins d'animations (prefers-reduced-motion).
   const [apparition, setApparition] = useState<ApparitionCarte>('swipe');
+  // Durée de l'entrée de chaque carte (ms) : celle de l'effet choisi, réglable de 200 à 1 500 ms.
+  const [dureeApparition, setDureeApparition] = useState(dureeApparitionParDefaut('swipe'));
+  const choisirApparition = (a: ApparitionCarte) => {
+    setApparition(a);
+    setDureeApparition(dureeApparitionParDefaut(a));
+  };
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) setApparition('fondu');
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) choisirApparition('fondu');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const dureeMiniTotale = Math.ceil(dureeMiniChamps(nbJoursChamps) + (abonne ? DUREE_ABONNE : 0));
   const dureeChampsEff = Math.min(60, Math.max(dureeMiniTotale, dureeChamps));
@@ -2060,9 +2067,24 @@ export default function VideoWeekEnd({
       zone: nomDepartement.toUpperCase(),
       duree: dureeContenuChamps,
       apparition,
+      dureeApparition,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genre, geoChamps, donneesChamps, cleChamps, themeChamps, format.l, format.h, titreChamps[0], titreChamps[1], dureeContenuChamps, apparition]);
+  }, [genre, geoChamps, donneesChamps, cleChamps, themeChamps, format.l, format.h, titreChamps[0], titreChamps[1], dureeContenuChamps, apparition, dureeApparition]);
+
+  // Aperçu de l'effet d'apparition : lecture du passage de la 1re à la 2e carte, puis pause.
+  const minuteurApercu = useRef(0);
+  const apercuApparition = () => {
+    if (!champs) return;
+    const debut = champs.debutsJours[1] ?? champs.debutsJours[0] ?? 0;
+    clearTimeout(minuteurApercu.current);
+    setLecture(false);
+    setT(Math.max(0, debut - 0.5));
+    // Lecture relancée au rendu suivant (une fois la position prise en compte), arrêtée une seconde après la fin de l'effet.
+    requestAnimationFrame(() => setLecture(true));
+    minuteurApercu.current = window.setTimeout(() => setLecture(false), 500 + dureeApparition + 1200);
+  };
+  useEffect(() => () => clearTimeout(minuteurApercu.current), []);
 
   const avecHook = format.id === 'hook';
   const positions = useMemo(() => {
@@ -2640,7 +2662,7 @@ export default function VideoWeekEnd({
             </label>
             <label className="text-sm font-medium">
               <span className={legende}>Apparition des cartes</span>
-              <select value={apparition} onChange={(e) => setApparition(e.target.value as ApparitionCarte)} className={selectBarre}>
+              <select value={apparition} onChange={(e) => choisirApparition(e.target.value as ApparitionCarte)} className={selectBarre}>
                 {APPARITIONS_CARTES.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.libelle}
@@ -2648,6 +2670,20 @@ export default function VideoWeekEnd({
                 ))}
               </select>
             </label>
+            <label className="text-sm font-medium">
+              <span className={legende}>Durée de l’apparition : {dureeApparition} ms</span>
+              <input type="range" min={200} max={1500} step={50} value={dureeApparition} onChange={(e) => setDureeApparition(Number(e.target.value))} className="w-full" aria-label="Durée de l'apparition de chaque carte en millisecondes" />
+              <span className="flex justify-between text-xs text-muted">
+                <span>200 ms (vif)</span>
+                <button type="button" onClick={() => setDureeApparition(dureeApparitionParDefaut(apparition))} className="underline">
+                  durée conseillée
+                </button>
+                <span>1 500 ms (lent)</span>
+              </span>
+            </label>
+            <button type="button" onClick={apercuApparition} disabled={!champs} className="rounded-lg border border-primary px-3 py-1.5 text-sm font-semibold text-primary disabled:opacity-50">
+              ▶ Prévisualiser l’effet (passage à la 2e carte)
+            </button>
             <label className="text-sm font-medium">
               <span className={legende}>
                 Durée de la vidéo : {dureeChampsEff} s{abonne ? ' (« Abonnez-vous ! » compris)' : ''}
