@@ -174,8 +174,8 @@ export const WINDCHILL_SCALE = [
 /* ---------- Définitions des classements ---------- */
 
 export type RankingId =
-  | 't' | 'dt24' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records' | 'tx12' | 'tx24'
-  | 'tn-prov' | 'tn-matin' | 'tn-0618' | 'tn-1806' | 'tn-fin' | 'tn12' | 'tn24'
+  | 't' | 'dt24' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records' | 'tx3' | 'tx6' | 'tx12' | 'tx24'
+  | 'tn-prov' | 'tn-matin' | 'tn-0618' | 'tn-1806' | 'tn-fin' | 'tn3' | 'tn6' | 'tn12' | 'tn24'
   | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr0' | 'rr24c' | 'rr36' | 'rr48' | 'rr72'
   | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf36' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp6' | 'dp9' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
@@ -306,6 +306,8 @@ export const RANKINGS: Ranking[] = [
   { id: 'tx-1806', short: 'Class. TX 18-06 UTC', label: 'Classement des températures maximales de 18 à 06 UTC', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.night, value: (o, w, n) => aggMax(o, w.night, n) },
   { id: 'tx-fin', short: 'Class. TX finales', label: 'Classement des températures maximales finales (8 h → 8 h locales, veille)', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.txFin, value: (o, w, n) => txFin(o, w, n) },
   { id: 'tx-records', short: 'Records prov. TX', label: 'Classement records provisoires des températures maximales', group: TX, ...T, order: 'desc', record: 'tx', temp: true, window: (w) => w.txProv, value: (o, w, n) => aggMax(o, w.txProv, n) },
+  { id: 'tx3', short: 'TX 3 h', label: 'Classement des températures maximales sur 3 heures glissantes', group: TX, ...T, order: 'desc', temp: true, value: txGlissante(3) },
+  { id: 'tx6', short: 'TX 6 h', label: 'Classement des températures maximales sur 6 heures glissantes', group: TX, ...T, order: 'desc', temp: true, value: txGlissante(6) },
   { id: 'tx12', short: 'TX 12 h', label: 'Classement des températures maximales sur 12 heures glissantes', group: TX, ...T, order: 'desc', temp: true, value: txGlissante(12) },
   { id: 'tx24', short: 'TX 24 h', label: 'Classement des températures maximales sur 24 heures glissantes', group: TX, ...T, order: 'desc', temp: true, value: tx24 },
   { id: 'tn-prov', short: 'Class. TN prov.', label: 'Classement des températures minimales provisoires (20 h → 8 h locales)', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnProv, value: (o, w, n) => aggMin(o, w.tnProv, n) },
@@ -314,6 +316,8 @@ export const RANKINGS: Ranking[] = [
   { id: 'tn-1806', short: 'Class. TN 18-06 UTC', label: 'Classement des températures minimales de 18 à 06 UTC', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.night, value: (o, w, n) => aggMin(o, w.night, n) },
   { id: 'tn-fin', short: 'Class. TN finales', label: 'Classement des températures minimales finales (20 h → 8 h locales)', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnFin, value: (o, w, n) => tnFin(o, w, n) },
   { id: 'tn-records', short: 'Records prov. TN', label: 'Classement records provisoires des températures minimales', group: TN, ...T, order: 'asc', record: 'tn', temp: true, window: (w) => w.tnProv, value: (o, w, n) => aggMin(o, w.tnProv, n) },
+  { id: 'tn3', short: 'TN 3 h', label: 'Classement des températures minimales sur 3 heures glissantes', group: TN, ...T, order: 'asc', temp: true, value: tnGlissante(3) },
+  { id: 'tn6', short: 'TN 6 h', label: 'Classement des températures minimales sur 6 heures glissantes', group: TN, ...T, order: 'asc', temp: true, value: tnGlissante(6) },
   { id: 'tn12', short: 'TN 12 h', label: 'Classement des températures minimales sur 12 heures glissantes', group: TN, ...T, order: 'asc', temp: true, value: tnGlissante(12) },
   { id: 'tn24', short: 'TN 24 h', label: 'Classement des températures minimales sur 24 heures glissantes', group: TN, ...T, order: 'asc', temp: true, value: tn24 },
 

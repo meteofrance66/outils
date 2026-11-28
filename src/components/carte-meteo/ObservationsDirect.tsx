@@ -9,6 +9,8 @@ import CarteInfo, { type PoliceValeurs, type PointInfo } from './CarteInfo';
 import { useBilans } from './useBilans';
 import ChoixZone, { useZone } from './ChoixZone';
 
+/** Au-delà, les observations sont jugées périmées : alerte rouge. */
+const SEUIL_RETARD_MIN = 60;
 const THEMES_OBS = THEMES_BILAN.filter((t) => t.groupe === GROUPE_OBS);
 /** Pluie en direct : relevés, cumuls moyens du mois et de l'année, records de 24 h du mois et absolus, battus ? */
 const THEMES_PLUIE = THEMES_BILAN.filter((t) => t.groupe === GROUPE_PLUIE_DIRECT);
@@ -34,6 +36,13 @@ const COULEURS: Record<(typeof RUBRIQUES_OBS)[number], string> = {
  */
 export default function ObservationsDirect() {
   const { bilans, erreur, reessayer } = useBilans();
+  // Âge des observations (minutes), recalculé chaque minute : une page restée ouverte passe en alerte rouge d'elle-même.
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setMaintenant(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const retardMin = bilans?.majA ? Math.max(0, Math.round((maintenant - Date.parse(bilans.majA)) / 60_000)) : 0;
   const [taille, setTaille] = useState(150);
   const [logoId, setLogoId] = useState('aucun');
   const [echelleTop, setEchelleTop] = useState(0);
@@ -214,10 +223,17 @@ export default function ObservationsDirect() {
           </div>
         )}
         {bilans?.majA && (
-          <p className="text-sm text-muted">
-            Observations Météo-France, mise à jour{' '}
-            {new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}.
-          </p>
+          <>
+            <p className={retardMin > SEUIL_RETARD_MIN ? 'text-sm font-bold text-danger' : 'text-sm text-muted'}>
+              Observations Météo-France, mise à jour{' '}
+              {new Date(bilans.majA).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' })}.
+            </p>
+            {retardMin > SEUIL_RETARD_MIN && (
+              <p role="alert" className="rounded-lg border-2 border-red-600 bg-red-600 px-4 py-3 text-base font-bold text-white">
+                ⚠️ ALERTE : les observations datent de {retardMin >= 120 ? `${Math.floor(retardMin / 60)} h ${String(retardMin % 60).padStart(2, '0')}` : `${retardMin} min`} (plus de {SEUIL_RETARD_MIN} min). Les cartes ne sont plus à jour : ne les publiez pas avant le retour des relevés.
+              </p>
+            )}
+          </>
         )}
       </div>
 

@@ -5,7 +5,7 @@ import ObservationsDirect from '@/components/carte-meteo/ObservationsDirect';
 export const metadata: Metadata = {
   title: 'Observations météo en direct en France : pluie, rafales, pression, humidex, ressenti',
   description:
-    "Cartes des relevés en direct de toutes les stations Météo-France : température et variation sur 24 h, humidex, ressenti au vent, minimales et maximales sur 12 et 24 h, pluie, rafales, pression et sa variation, humidité, ensoleillement, et records de pluie en 24 h battus ou approchés. Export en JPG.",
+    "Cartes des relevés en direct de toutes les stations Météo-France : température et variation sur 24 h, humidex, ressenti au vent, minimales et maximales sur 3, 6, 12 et 24 h, pluie, rafales, pression et sa variation, humidité, ensoleillement, et records de pluie en 24 h battus ou approchés. Export en JPG.",
   alternates: { canonical: '/outils/observations-en-direct/' },
 };
 
@@ -32,7 +32,7 @@ export default function PageObservationsDirect() {
       </div>
       <p className="mt-8 max-w-3xl text-muted">
         Les derniers relevés des stations Météo-France, sur une seule carte : choisissez la mesure avec les boutons. Température du moment et sa
-        variation sur 24 heures, humidex et température ressentie au vent ; minimales et maximales sur les 12 ou 24 dernières heures ; pluie sur
+        variation sur 24 heures, humidex et température ressentie au vent ; minimales et maximales sur les 3, 6, 12 ou 24 dernières heures ; pluie sur
         24 heures ou depuis ce matin (pluviométrie partielle, depuis 6 h UTC), dernières rafales et rafales sur 24 heures ; pression au niveau de la
         mer et sa variation sur 3 heures, humidité relative et ensoleillement sur 24 heures. Plus bas, la pluie en direct : pluie de la journée,
         cumul moyen du mois et de l&apos;année, et le record de pluie en 24 heures du mois et absolu de chaque station, avec les boutons
