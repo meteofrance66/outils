@@ -176,8 +176,8 @@ export const WINDCHILL_SCALE = [
 export type RankingId =
   | 't' | 'dt24' | 'tx-prov' | 'tx-0618' | 'tx-1806' | 'tx-fin' | 'tx-records' | 'tn-records' | 'tx3' | 'tx6' | 'tx12' | 'tx24'
   | 'tn-prov' | 'tn-matin' | 'tn-0618' | 'tn-1806' | 'tn-fin' | 'tn3' | 'tn6' | 'tn12' | 'tn24'
-  | 'rr1' | 'rr3' | 'rr12' | 'rr24' | 'rr6' | 'rr0' | 'rr24c' | 'rr36' | 'rr48' | 'rr72'
-  | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf24' | 'raf36' | 'raf48' | 'raf72'
+  | 'rr1' | 'rr3' | 'rr6h' | 'rr12' | 'rr24' | 'rr6' | 'rr0' | 'rr24c' | 'rr36' | 'rr48' | 'rr72'
+  | 'ff' | 'fxi24' | 'fxi48' | 'fxi72' | 'raf1' | 'raf3' | 'raf6' | 'raf12' | 'raf24' | 'raf36' | 'raf48' | 'raf72'
   | 'pmer' | 'dp3' | 'dp6' | 'dp9' | 'dp12' | 'dp24' | 'u' | 'vv' | 'snow' | 'insol24'
   | 'td' | 'windchill' | 'humidex' | 'sol10' | 'sol20' | 'sol50' | 'sol100'
   | 'n-tx' | 'n-tn' | 'n-tx24' | 'n-tn24' | 'e-recm-tx' | 'e-recm-tn' | 'e-reca-tx' | 'e-reca-tn';
@@ -250,14 +250,15 @@ export const synopEnd = (obs: Record<string, HourlyObs[]>) => {
  * Rafales max. sur h heures : rafales 6 min (raf10, temps réel) si la station en a,
  * sinon messages SYNOP comptés depuis le dernier message publié (~1 jour de décalage).
  */
-const synopGust = (h: number) => (obs: HourlyObs[], _w: unknown, now: number, c: Ctx): Agg | null => {
+const synopGust = (h: number, sansSynop = false) => (obs: HourlyObs[], _w: unknown, now: number, c: Ctx): Agg | null => {
   if (c.rafH) {
     const from = new Date(now - h * H).toISOString();
     let best: [string, number] | undefined;
     for (const [t, v] of Object.entries(c.rafH)) if (t > from && (!best || v > best[1])) best = [t, v];
     if (best) return { value: best[1], n: 1, expected: 1, at: best[0] };
   }
-  if (!c.synopEnd) return null;
+  // Fenêtres courtes (3, 6, 12 h) : les messages SYNOP datent de la veille, ils n'ont pas leur place ici.
+  if (sansSynop || !c.synopEnd) return null;
   let best: HourlyObs | undefined;
   for (const o of inWindow(obs, { start: c.synopEnd - h * H, end: c.synopEnd })) if (o.gust != null && (!best || o.gust > best.gust!)) best = o;
   return best ? { value: best.gust!, n: 1, expected: 1, at: best.time } : null;
@@ -325,6 +326,7 @@ export const RANKINGS: Ranking[] = [
   { id: 'rr3', short: 'Pluie 3 h', label: 'Classement de la pluie sur 3 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(3) },
   { id: 'rr6', short: 'Pluie depuis 6 h UTC', label: 'Classement de la pluie depuis 6 h UTC, avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.since6, value: (o, w, n) => aggSum(o, w.since6, 'rr1', n) },
   { id: 'rr0', short: 'Pluie depuis 00 h', label: 'Classement de la pluie de la journée, depuis minuit (heure de Paris)', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.sinceMidnight, value: (o, w, n) => aggSum(o, w.sinceMidnight, 'rr1', n) },
+  { id: 'rr6h', short: 'Pluie 6 h', label: 'Classement de la pluie sur 6 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(6) },
   { id: 'rr12', short: 'Pluie 12 h', label: 'Classement de la pluie sur 12 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', value: slide(12) },
   { id: 'rr24', short: 'Pluie 24 h', label: 'Classement de la pluie sur 24 heures glissantes', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', value: slide(24) },
   { id: 'rr24c', short: 'Pluie 24 h climato', label: 'Classement de la pluie de la journée climatologique (6 h UTC → 6 h UTC le lendemain), avec records', group: P, unit: 'mm', digits: 1, order: 'desc', record: 'rr24', window: (w) => w.clim, value: (o, w, n) => aggSum(o, w.clim, 'rr1', n) },
@@ -335,6 +337,9 @@ export const RANKINGS: Ranking[] = [
 
 
   { id: 'raf1', short: 'Rafales', label: 'Classement des rafales maximales sur la dernière heure (relevés 6 min)', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: rafRecent(60) },
+  { id: 'raf3', short: 'Rafales 3 h', label: 'Classement des rafales maximales sur 3 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: synopGust(3, true) },
+  { id: 'raf6', short: 'Rafales 6 h', label: 'Classement des rafales maximales sur 6 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: synopGust(6, true) },
+  { id: 'raf12', short: 'Rafales 12 h', label: 'Classement des rafales maximales sur 12 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, value: synopGust(12, true) },
   { id: 'raf24', short: 'Rafales 24 h', label: 'Classement des rafales maximales sur 24 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(24) },
   { id: 'raf36', short: 'Rafales 36 h', label: 'Classement des rafales maximales sur 36 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(36) },
   { id: 'raf48', short: 'Rafales 48 h', label: 'Classement des rafales maximales sur 48 heures', group: V, unit: 'km/h', digits: 0, order: 'desc', instant: true, synop: true, value: synopGust(48) },
