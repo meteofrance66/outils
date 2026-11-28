@@ -6,6 +6,14 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs' && process.env.NODE_ENV === 'production') {
     const { demarrerPrechauffage } = await import('./lib/carte-meteo/prechauffage');
     demarrerPrechauffage();
+    // Observations Météo-France : collecte lancée au démarrage puis vérifiée toutes les 10 minutes, sans attendre qu'un visiteur ouvre une page
+    // (sinon la date de mise à jour restait bloquée sur la veille tant que personne ne venait, et le premier visiteur voyait des relevés périmés).
+    const { getSnapshot, obsConfigured } = await import('./lib/obs/store');
+    if (obsConfigured()) {
+      const verifier = () => void getSnapshot().catch((e) => console.error('[obs] vérification périodique', e));
+      setTimeout(verifier, 20_000);
+      setInterval(verifier, 10 * 60_000);
+    }
   }
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return;
   if (process.env.NEXT_RUNTIME === 'nodejs') await import('./sentry.server.config');
