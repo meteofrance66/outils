@@ -14,7 +14,7 @@ import type { CarteTexte, RubriqueTexte } from '@/lib/carte-meteo/texte-ia';
 import { SEUIL_COTE_KM, chargerCote, distanceCoteKm, secteurDe } from '@/lib/carte-meteo/secteurs';
 import { chargerJoursChamps } from '@/lib/carte-meteo/donnees-champs';
 import { THEMES_CHAMPS, jourLong as jourLongChamps, titreAuto as titreAutoChamps, type PointChampJour, type ThemeChamp } from '@/lib/carte-meteo/planche-champs';
-import { dureeMiniChamps, dureeParDefautChamps, preparerVideoChamps, type VideoChamps } from '@/lib/carte-meteo/video-champs';
+import { APPARITIONS_CARTES, dureeMiniChamps, dureeParDefautChamps, preparerVideoChamps, type ApparitionCarte, type VideoChamps } from '@/lib/carte-meteo/video-champs';
 import { REPERES_66, useGeoChamps, type VilleRepere } from './useGeoChamps';
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, canEncodeAudio, canEncodeVideo } from 'mediabunny';
 
@@ -2017,6 +2017,11 @@ export default function VideoWeekEnd({
   const departChampsEff = Math.min(departChamps, 9 - nbJoursChamps);
   // Durée totale voulue (60 s au plus, « Abonnez-vous ! » compris) ; le contenu en est le reste.
   const [dureeChamps, setDureeChamps] = useState(20);
+  // Entrée des cartes : Swipe Up par défaut ; fondu simple si l'appareil demande moins d'animations (prefers-reduced-motion).
+  const [apparition, setApparition] = useState<ApparitionCarte>('swipe');
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) setApparition('fondu');
+  }, []);
   const dureeMiniTotale = Math.ceil(dureeMiniChamps(nbJoursChamps) + (abonne ? DUREE_ABONNE : 0));
   const dureeChampsEff = Math.min(60, Math.max(dureeMiniTotale, dureeChamps));
   const dureeContenuChamps = dureeChampsEff - (abonne ? DUREE_ABONNE : 0);
@@ -2054,9 +2059,10 @@ export default function VideoWeekEnd({
       source: 'Prévisions du modèle CEP',
       zone: nomDepartement.toUpperCase(),
       duree: dureeContenuChamps,
+      apparition,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genre, geoChamps, donneesChamps, cleChamps, themeChamps, format.l, format.h, titreChamps[0], titreChamps[1], dureeContenuChamps]);
+  }, [genre, geoChamps, donneesChamps, cleChamps, themeChamps, format.l, format.h, titreChamps[0], titreChamps[1], dureeContenuChamps, apparition]);
 
   const avecHook = format.id === 'hook';
   const positions = useMemo(() => {
@@ -2628,6 +2634,16 @@ export default function VideoWeekEnd({
                 {Array.from({ length: 9 - nbJoursChamps }, (_, k) => k + 1).map((k) => (
                   <option key={k} value={k}>
                     {k === 1 ? 'Demain' : `J+${k}`} ({jourLongChamps(ajouterJours(aujourdhui, k)).toLowerCase()})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm font-medium">
+              <span className={legende}>Apparition des cartes</span>
+              <select value={apparition} onChange={(e) => setApparition(e.target.value as ApparitionCarte)} className={selectBarre}>
+                {APPARITIONS_CARTES.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.libelle}
                   </option>
                 ))}
               </select>

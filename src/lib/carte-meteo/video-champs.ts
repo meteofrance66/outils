@@ -61,16 +61,120 @@ function chiffresCles(theme: ParamsPlancheChamps['theme'], points: ParamsPlanche
   }
 }
 
+/** Façon dont chaque carte entre à l'écran. */
+export type ApparitionCarte = 'swipe' | 'pop' | '3d' | 'balayage' | 'fondu';
+export const APPARITIONS_CARTES: { id: ApparitionCarte; libelle: string }[] = [
+  { id: 'swipe', libelle: '⬆️ Swipe Up (style TikTok)' },
+  { id: 'pop', libelle: '💥 Pop Zoom (moderne)' },
+  { id: '3d', libelle: '🧊 Reveal 3D (immersif)' },
+  { id: 'balayage', libelle: '➡️ Balayage de gauche à droite' },
+  { id: 'fondu', libelle: '🌫️ Fondu simple (sans mouvement)' },
+];
+
+/** Décélération progressive (cubic-bezier proche de « ease-out »). */
+const decel = (x: number) => 1 - (1 - clamp(x)) ** 3;
+
+/**
+ * Entrée de la carte `carte` (rectangle `r`) à l'instant `tl` (secondes depuis le début de son écran), par-dessus la précédente :
+ * - Swipe Up (350 ms) : la nouvelle monte du bas (100 % → 0 %, opacité 0 → 1), la précédente part vers le haut ;
+ * - Pop Zoom (400 ms) : échelle 85 % → 103 % → 100 %, flou 8 px → 0, opacité 0 → 1 ;
+ * - Reveal 3D (450 ms) : rotation X 45° → 0° en perspective (800 px), translation 50 px → 0, opacité 0 → 1 ;
+ * - Balayage (750 ms) et fondu (400 ms) : les entrées d'avant.
+ * Les durées et valeurs sont celles d'un écran de 1080 px de large (les distances en px suivent la largeur de la vidéo).
+ */
+function apparitionCarte(ctx: CanvasRenderingContext2D, effet: ApparitionCarte, precedente: HTMLCanvasElement | null, carte: HTMLCanvasElement, tl: number, r: { x: number; y: number; w: number; h: number }) {
+  const echellePx = r.w / 1040;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h);
+  ctx.clip();
+  if (effet === 'swipe') {
+    const p = decel(tl / 0.35);
+    if (precedente && p < 1) ctx.drawImage(precedente, r.x, r.y - p * r.h * 0.35);
+    ctx.globalAlpha = clamp(tl / 0.35);
+    ctx.drawImage(carte, r.x, r.y + (1 - p) * r.h);
+  } else if (effet === 'pop') {
+    const p = clamp(tl / 0.4);
+    if (precedente && p < 1) {
+      ctx.globalAlpha = 1 - p;
+      ctx.drawImage(precedente, r.x, r.y);
+    }
+    // 85 % → 103 % (aux deux tiers) → 100 %, chaque morceau avec décélération.
+    const e = p < 0.65 ? 0.85 + 0.18 * decel(p / 0.65) : 1.03 - 0.03 * decel((p - 0.65) / 0.35);
+    const flou = 8 * (1 - decel(p)) * echellePx;
+    ctx.globalAlpha = decel(p / 0.6);
+    if (flou > 0.3) ctx.filter = `blur(${flou.toFixed(1)}px)`;
+    ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
+    ctx.scale(e, e);
+    ctx.drawImage(carte, -r.w / 2, -r.h / 2);
+    ctx.filter = 'none';
+  } else if (effet === '3d') {
+    const p = decel(tl / 0.45);
+    if (precedente && p < 1) {
+      ctx.globalAlpha = 1 - p;
+      ctx.drawImage(precedente, r.x, r.y);
+    }
+    ctx.globalAlpha = clamp(tl / 0.3);
+    const theta = ((45 * Math.PI) / 180) * (1 - p);
+    const dy = 50 * echellePx * (1 - p);
+    if (theta < 0.002) ctx.drawImage(carte, r.x, r.y + dy);
+    else {
+      // Perspective par bandes horizontales : chaque bande est projetée (rotation autour de l'axe horizontal du milieu de la carte).
+      const P = 800 * echellePx * 2;
+      const cx = r.x + r.w / 2;
+      const cy = r.y + r.h / 2 + dy;
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+      const bande = 3;
+      for (let yb = 0; yb < r.h; yb += bande) {
+        const y0 = yb - r.h / 2;
+        const y1 = Math.min(yb + bande, r.h) - r.h / 2;
+        const proj = (y: number) => {
+          const z = y * sin;
+          const f = P / (P - z);
+          return { y: y * cos * f, f };
+        };
+        const a = proj(y0);
+        const b = proj(y1);
+        const f = (a.f + b.f) / 2;
+        const hb = Math.max(0.5, b.y - a.y + 0.6);
+        ctx.drawImage(carte, 0, yb, r.w, Math.min(bande, r.h - yb), cx - (r.w / 2) * f, cy + a.y, r.w * f, hb);
+      }
+    }
+  } else if (effet === 'balayage') {
+    if (precedente) ctx.drawImage(precedente, r.x, r.y);
+    const w = sortie(tl / 0.75);
+    ctx.beginPath();
+    ctx.rect(r.x, r.y, r.w * w, r.h);
+    ctx.clip();
+    ctx.drawImage(carte, r.x, r.y);
+    if (w < 1) {
+      const x = r.x + r.w * w;
+      const g = ctx.createLinearGradient(x - 40, 0, x + 4, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(1, 'rgba(255,255,255,0.85)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 40, r.y, 44, r.h);
+    }
+  } else {
+    const p = clamp(tl / 0.4);
+    if (precedente && p < 1) ctx.drawImage(precedente, r.x, r.y);
+    ctx.globalAlpha = p;
+    ctx.drawImage(carte, r.x, r.y);
+  }
+  ctx.restore();
+}
+
 export interface VideoChamps {
   duree: number;
   dessiner: (ctx: CanvasRenderingContext2D, t: number) => void;
 }
 
 /** `duree` : durée voulue de la vidéo en secondes, hors « Abonnez-vous ! » (absente : durée par défaut) ; elle s'ajuste en allongeant chaque carte. */
-type Params = Omit<ParamsPlancheChamps, 'ctx'> & { zone: string; duree?: number };
+type Params = Omit<ParamsPlancheChamps, 'ctx'> & { zone: string; duree?: number; apparition?: ApparitionCarte };
 
 export function preparerVideoChamps(p: Params): VideoChamps {
-  const { largeur: W, hauteur: H, theme, jours, titre, geo, source, zone } = p;
+  const { largeur: W, hauteur: H, theme, jours, titre, geo, source, zone, apparition = 'swipe' } = p;
   const def = THEMES_CHAMPS[theme];
   const niveaux = niveauxPlanche(theme, jours);
   const hb = hauteurBandeau(H);
@@ -171,28 +275,7 @@ export function preparerVideoChamps(p: Params): VideoChamps {
       titreCadre(ctx, jourLong(jours[k].iso), { x: pad, y: yCadre, w: lc, h: ht });
       ctx.fillStyle = '#0c0c12';
       ctx.fillRect(pad, yCarte, lc, hcF);
-      // Carte précédente dessous, nouvelle carte qui la balaie de gauche à droite en se posant (léger zoom).
-      if (k > 0) ctx.drawImage(cartes[k - 1], pad, yCarte);
-      const w = sortie(tl / 0.75);
-      // Pas de zoom ici : il rognerait l'étiquette du jour en haut de la carte.
-      const z = 1;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(pad, yCarte, lc * w, hcF);
-      ctx.clip();
-      ctx.translate(pad + lc / 2, yCarte + hcF / 2);
-      ctx.scale(z, z);
-      ctx.drawImage(cartes[k], -lc / 2, -hcF / 2);
-      ctx.restore();
-      // Bord lumineux du balayage.
-      if (w < 1) {
-        const x = pad + lc * w;
-        const g = ctx.createLinearGradient(x - 40, 0, x + 4, 0);
-        g.addColorStop(0, 'rgba(255,255,255,0)');
-        g.addColorStop(1, 'rgba(255,255,255,0.85)');
-        ctx.fillStyle = g;
-        ctx.fillRect(x - 40, yCarte, 44, hcF);
-      }
+      apparitionCarte(ctx, apparition, k > 0 ? cartes[k - 1] : null, cartes[k], tl, { x: pad, y: yCarte, w: lc, h: hcF });
       // Chiffres clés : ils montent une fois la carte posée.
       const lignes = faits[k];
       if (lignes.length > 0) {
