@@ -18,6 +18,8 @@ const csp = (frameAncestors) =>
     "font-src 'self' data: https://assets.brevo.com",
     "img-src 'self' data: https://sibforms.com https://assets.brevo.com https://data.geopf.fr https://gibs.earthdata.nasa.gov https://tile.openstreetmap.org https://tile.opentopomap.org https://server.arcgisonline.com",
     "connect-src 'self' https://*.sibforms.com https://sibforms.com https://data.geopf.fr https://gibs.earthdata.nasa.gov https://tile.openstreetmap.org https://tile.opentopomap.org https://server.arcgisonline.com https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io",
+    // Lecteurs audio et vidéo : fichiers du site et sons générés dans le navigateur (voix de synthèse, aperçu), adresses blob:.
+    "media-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' https://*.sibforms.com",
